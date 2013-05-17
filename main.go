@@ -228,7 +228,6 @@ type TagHeader struct {
 
 type FrameHeader struct {
 	id    FrameType
-	size  int
 	flags FrameFlags
 }
 
@@ -242,13 +241,11 @@ type Frame interface {
 
 type TextInformationFrame struct {
 	FrameHeader
-	Encoding Encoding
-	Text     string
+	Text string
 }
 
 type UserTextInformationFrame struct {
 	FrameHeader
-	Encoding    Encoding
 	Description string
 	Text        string
 }
@@ -266,14 +263,12 @@ type URLLinkFrame struct {
 
 type UserDefinedURLLinkFrame struct {
 	FrameHeader
-	Encoding    Encoding
 	Description string
 	URL         string
 }
 
 type CommentFrame struct {
 	FrameHeader
-	Encoding    Encoding
 	Language    string
 	Description string
 	Text        string
@@ -379,7 +374,7 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	header.id = FrameType(headerBytes.ID[:])
 	header.flags = FrameFlags(int16(headerBytes.Flags[0])<<8 | int16(headerBytes.Flags[1]))
-	header.size = desynchsafeInt(headerBytes.Size)
+	headerSize := desynchsafeInt(headerBytes.Size)
 
 	if header.flags.Compressed() {
 		// TODO: Read decompressed size (4 bytes)
@@ -401,19 +396,20 @@ func readFrame(r io.Reader) (Frame, error) {
 	// TODO what if there's no padding and we're reading audio data?
 
 	if header.id[0] == 'T' && header.id != "TXXX" {
+		var encoding Encoding
 		frame := TextInformationFrame{FrameHeader: header}
-		information := make([]byte, header.size-1)
-		binary.Read(r, binary.BigEndian, &frame.Encoding)
+		information := make([]byte, headerSize-1)
+		binary.Read(r, binary.BigEndian, &encoding)
 		binary.Read(r, binary.BigEndian, &information)
 
-		frame.Text = string(reencode(information, frame.Encoding))
+		frame.Text = string(reencode(information, encoding))
 
 		return frame, nil
 	}
 
 	if header.id[0] == 'W' && header.id != "WXXX" {
 		frame := URLLinkFrame{FrameHeader: header}
-		url := make([]byte, header.size)
+		url := make([]byte, headerSize)
 		binary.Read(r, binary.BigEndian, url)
 		frame.URL = string(iso88591ToUTF8(url))
 
@@ -422,28 +418,30 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	switch header.id {
 	case "TXXX":
+		var encoding Encoding
 		frame := UserTextInformationFrame{FrameHeader: header}
-		binary.Read(r, binary.BigEndian, &frame.Encoding)
-		rest := make([]byte, header.size-1)
+		binary.Read(r, binary.BigEndian, &encoding)
+		rest := make([]byte, headerSize-1)
 		binary.Read(r, binary.BigEndian, &rest)
-		parts := splitNullN(rest, frame.Encoding, 2)
-		frame.Description = string(reencode(parts[0], frame.Encoding))
-		frame.Text = string(reencode(parts[1], frame.Encoding))
+		parts := splitNullN(rest, encoding, 2)
+		frame.Description = string(reencode(parts[0], encoding))
+		frame.Text = string(reencode(parts[1], encoding))
 
 		return frame, nil
 	case "WXXX":
+		var encoding Encoding
 		frame := UserDefinedURLLinkFrame{FrameHeader: header}
-		binary.Read(r, binary.BigEndian, &frame.Encoding)
-		rest := make([]byte, header.size-1)
+		binary.Read(r, binary.BigEndian, &encoding)
+		rest := make([]byte, headerSize-1)
 		binary.Read(r, binary.BigEndian, &rest)
-		parts := splitNullN(rest, frame.Encoding, 2)
-		frame.Description = string(reencode(parts[0], frame.Encoding))
+		parts := splitNullN(rest, encoding, 2)
+		frame.Description = string(reencode(parts[0], encoding))
 		frame.URL = string(iso88591ToUTF8(parts[1]))
 
 		return frame, nil
 	case "UFID":
 		frame := UniqueFileIdentifierFrame{FrameHeader: header}
-		rest := make([]byte, header.size)
+		rest := make([]byte, headerSize)
 		binary.Read(r, binary.BigEndian, &rest)
 		parts := bytes.SplitN(rest, []byte{0}, 2)
 		frame.Owner = string(reencode(parts[0], iso88591))
@@ -457,7 +455,7 @@ func readFrame(r io.Reader) (Frame, error) {
 			language [3]byte
 			rest     []byte
 		)
-		rest = make([]byte, header.size-4)
+		rest = make([]byte, headerSize-4)
 
 		binary.Read(r, binary.BigEndian, &encoding)
 		binary.Read(r, binary.BigEndian, &language)
@@ -465,7 +463,6 @@ func readFrame(r io.Reader) (Frame, error) {
 
 		parts := splitNullN(rest, encoding, 2)
 
-		frame.Encoding = encoding
 		frame.Language = string(language[:])
 		frame.Description = string(reencode(parts[0], encoding))
 		frame.Text = string(reencode(parts[1], encoding))
@@ -473,7 +470,7 @@ func readFrame(r io.Reader) (Frame, error) {
 		return frame, nil
 	default:
 		fmt.Println(header.ID)
-		r.Read(make([]byte, header.size))
+		r.Read(make([]byte, headerSize))
 
 		return UnsupportedFrame{header}, nil
 	}

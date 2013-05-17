@@ -17,10 +17,10 @@ import (
 var _ = spew.Dump
 
 const (
-	ISO88591 = 0
-	UTF16BOM = 1
-	UTF16BE  = 2
-	UTF8     = 3
+	iso88591 = 0
+	utf16bom = 1
+	utf16be  = 2
+	utf8     = 3
 )
 
 var FrameNames = map[string]string{
@@ -143,13 +143,13 @@ func (f FrameType) String() string {
 
 func (e Encoding) String() string {
 	switch e {
-	case ISO88591:
+	case iso88591:
 		return "ISO-8859-1"
-	case UTF16BOM:
+	case utf16bom:
 		return "UTF-16"
-	case UTF16BE:
+	case utf16be:
 		return "UTF-16BE"
-	case UTF8:
+	case utf8:
 		return "UTF-8"
 	default:
 		return fmt.Sprintf("%d", byte(e))
@@ -158,7 +158,7 @@ func (e Encoding) String() string {
 
 func (e Encoding) terminator() []byte {
 	switch e {
-	case UTF16BOM, UTF16BE:
+	case utf16bom, utf16be:
 		return []byte{0, 0}
 	default:
 		return []byte{0}
@@ -323,7 +323,7 @@ func splitNullN(data []byte, encoding Encoding, n int) [][]byte {
 func reencode(b []byte, encoding Encoding) []byte {
 	// TODO: truncate after null byte
 	switch encoding {
-	case UTF16BOM:
+	case utf16bom:
 		translator, err := charset.TranslatorFrom("UTF16")
 		if err != nil {
 			// FIXME return an error
@@ -339,7 +339,7 @@ func reencode(b []byte, encoding Encoding) []byte {
 		copy(ret, cdata)
 
 		return ret
-	case UTF16BE:
+	case utf16be:
 		translator, err := charset.TranslatorFrom("UTF16BE")
 		if err != nil {
 			// FIXME return an error
@@ -355,9 +355,9 @@ func reencode(b []byte, encoding Encoding) []byte {
 		copy(ret, cdata)
 
 		return ret
-	case UTF8:
+	case utf8:
 		return b
-	case ISO88591:
+	case iso88591:
 		return iso88591ToUTF8(b)
 	}
 	panic("unsupported")
@@ -446,7 +446,7 @@ func readFrame(r io.Reader) (Frame, error) {
 		rest := make([]byte, header.size)
 		binary.Read(r, binary.BigEndian, &rest)
 		parts := bytes.SplitN(rest, []byte{0}, 2)
-		frame.Owner = string(reencode(parts[0], ISO88591))
+		frame.Owner = string(reencode(parts[0], iso88591))
 		frame.Identifier = parts[1]
 
 		return frame, nil

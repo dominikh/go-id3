@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"io"
+	"io/ioutil"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -21,6 +23,18 @@ const (
 	utf16bom = 1
 	utf16be  = 2
 	utf8     = 3
+
+	frameLength = 10
+)
+
+var (
+	utf16nul = []byte{0, 0}
+	nul      = []byte{0}
+
+	utf8byte = []byte{utf8}
+
+	id3byte     = []byte("ID3")
+	versionByte = []byte{4, 0}
 )
 
 var FrameNames = map[string]string{
@@ -127,10 +141,78 @@ var FrameNames = map[string]string{
 // TODO: unsynchronisation
 
 type HeaderFlags byte
-type FrameFlags int16
+type FrameFlags uint16
 type Version int16
 type Encoding byte
 type FrameType string
+type FramesMap map[FrameType][]Frame
+
+type NotATagHeader struct {
+	Magic [3]byte
+}
+
+type TagHeader struct {
+	Version Version
+	Flags   HeaderFlags
+	Size    int
+}
+
+type FrameHeader struct {
+	id    FrameType
+	flags FrameFlags
+}
+
+type Frame interface {
+	ID() FrameType
+	io.WriterTo
+	size() int
+}
+
+type TextInformationFrame struct {
+	FrameHeader
+	Text string
+}
+
+type UserTextInformationFrame struct {
+	FrameHeader
+	Description string
+	Text        string
+}
+
+type UniqueFileIdentifierFrame struct {
+	FrameHeader
+	Owner      string
+	Identifier []byte
+}
+
+type URLLinkFrame struct {
+	FrameHeader
+	URL string
+}
+
+type UserDefinedURLLinkFrame struct {
+	FrameHeader
+	Description string
+	URL         string
+}
+
+type CommentFrame struct {
+	FrameHeader
+	Language    string
+	Description string
+	Text        string
+}
+
+type UnsupportedFrame struct {
+	FrameHeader
+}
+
+type File struct {
+	f       *os.File
+	hasTags bool
+	Header  TagHeader
+	Frames  FramesMap
+}
 
 func (f FrameType) String() string {
 	v, ok := FrameNames[string(f)]
@@ -159,18 +241,14 @@ func (e Encoding) String() string {
 func (e Encoding) terminator() []byte {
 	switch e {
 	case utf16bom, utf16be:
-		return []byte{0, 0}
+		return utf16nul
 	default:
-		return []byte{0}
+		return nul
 	}
 }
 
 // TODO: HeaderFlags.String()
 // TODO: FrameFlags.String()
-
-type NotATagHeader struct {
-	Magic [3]byte
-}
 
 func (NotATagHeader) Error() string {
 	return "Not an ID3v2 header"
@@ -220,66 +298,116 @@ func (v Version) String() string {
 	return fmt.Sprintf("ID3v2.%.1d.%.1d", v>>8, v&0xFF)
 }
 
-type TagHeader struct {
-	Version Version
-	Flags   HeaderFlags
-	Size    int
-}
-
-type FrameHeader struct {
-	id    FrameType
-	flags FrameFlags
-}
-
 func (f FrameHeader) ID() FrameType {
 	return f.id
 }
 
-type Frame interface {
-	ID() FrameType
+func (f FrameHeader) serialize(size int) []byte {
+	out := make([]byte, 10)
+	copy(out, f.id)
+
+	flagBytes := intToBytes(int(f.flags))
+	copy(out[8:10], flagBytes[2:4])
+
+	sizeBytes := intToBytes(synchsafeInt(size))
+	copy(out[4:8], sizeBytes)
+
+	return out
 }
 
-type TextInformationFrame struct {
-	FrameHeader
-	Text string
+func (f TextInformationFrame) size() int {
+	return frameLength + len(f.Text) + 1
 }
 
-type UserTextInformationFrame struct {
-	FrameHeader
-	Description string
-	Text        string
+func (f TextInformationFrame) WriteTo(w io.Writer) (int64, error) {
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		utf8byte,
+		[]byte(f.Text),
+	)
 }
 
-type UniqueFileIdentifierFrame struct {
-	FrameHeader
-	Owner      string
-	Identifier []byte
+func (f UserTextInformationFrame) size() int {
+	return frameLength + len(f.Description) + len(f.Text) + 2
 }
 
-type URLLinkFrame struct {
-	FrameHeader
-	URL string
+func (f UserTextInformationFrame) WriteTo(w io.Writer) (int64, error) {
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		utf8byte,
+		[]byte(f.Description),
+		nul,
+		[]byte(f.Text),
+	)
 }
 
-type UserDefinedURLLinkFrame struct {
-	FrameHeader
-	Description string
-	URL         string
+func (f UniqueFileIdentifierFrame) size() int {
+	iso := utf8ToISO88591([]byte(f.Owner))
+	return frameLength + len(f.Identifier) + len(iso) + 1
 }
 
-type CommentFrame struct {
-	FrameHeader
-	Language    string
-	Description string
-	Text        string
+func (f UniqueFileIdentifierFrame) WriteTo(w io.Writer) (int64, error) {
+	iso := utf8ToISO88591([]byte(f.Owner))
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		iso,
+		nul,
+		f.Identifier,
+	)
 }
 
-type UnsupportedFrame struct {
-	FrameHeader
+func (f URLLinkFrame) size() int {
+	return frameLength + len(utf8ToISO88591([]byte(f.URL)))
 }
 
-func desynchsafeInt(b [4]byte) int {
-	return int(b[0]<<23) | int(b[1]<<15) | int(b[2])<<7 | int(b[3])
+func (f URLLinkFrame) WriteTo(w io.Writer) (int64, error) {
+	iso := utf8ToISO88591([]byte(f.URL))
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		iso,
+	)
+}
+
+func (f UserDefinedURLLinkFrame) size() int {
+	iso := utf8ToISO88591([]byte(f.URL))
+	return frameLength + len(f.Description) + len(iso) + 2
+}
+
+func (f UserDefinedURLLinkFrame) WriteTo(w io.Writer) (int64, error) {
+	iso := utf8ToISO88591([]byte(f.URL))
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		utf8byte,
+		[]byte(f.Description),
+		nul,
+		iso,
+	)
+}
+
+func (f CommentFrame) size() int {
+	return frameLength + len(f.Description) + len(f.Text) + 5
+}
+
+func (f CommentFrame) WriteTo(w io.Writer) (int64, error) {
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		utf8byte,
+		[]byte(f.Language),
+		[]byte(f.Description),
+		nul,
+		[]byte(f.Text),
+	)
+}
+
+func (UnsupportedFrame) size() int {
+	return 0
+}
+
+func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
+	log.Println("Cannot serialize unsupported frame:", f)
+	// TODO remove println
+	// TODO check if unsupported frame should be dropped or copied verbatim
+	return 0, nil
 }
 
 // readHeader reads an ID3v2 header. It expects the reader to be
@@ -308,54 +436,6 @@ func readHeader(r io.Reader) (TagHeader, error) {
 	header.Size = desynchsafeInt(bytes.Size)
 
 	return header, nil
-}
-
-func splitNullN(data []byte, encoding Encoding, n int) [][]byte {
-	delim := encoding.terminator()
-	return bytes.SplitN(data, delim, n)
-}
-
-func reencode(b []byte, encoding Encoding) []byte {
-	// TODO: truncate after null byte
-	switch encoding {
-	case utf16bom:
-		translator, err := charset.TranslatorFrom("UTF16")
-		if err != nil {
-			// FIXME return an error
-			panic(err)
-		}
-
-		_, cdata, err := translator.Translate(b, true)
-		if err != nil {
-			// FIXME return an error
-			panic(err)
-		}
-		ret := make([]byte, len(cdata))
-		copy(ret, cdata)
-
-		return ret
-	case utf16be:
-		translator, err := charset.TranslatorFrom("UTF16BE")
-		if err != nil {
-			// FIXME return an error
-			panic(err)
-		}
-
-		_, cdata, err := translator.Translate(b, true)
-		if err != nil {
-			// FIXME return an error
-			panic(err)
-		}
-		ret := make([]byte, len(cdata))
-		copy(ret, cdata)
-
-		return ret
-	case utf8:
-		return b
-	case iso88591:
-		return iso88591ToUTF8(b)
-	}
-	panic("unsupported")
 }
 
 func readFrame(r io.Reader) (Frame, error) {
@@ -418,105 +498,87 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	switch header.id {
 	case "TXXX":
-		var encoding Encoding
-		frame := UserTextInformationFrame{FrameHeader: header}
-		binary.Read(r, binary.BigEndian, &encoding)
-		rest := make([]byte, headerSize-1)
-		binary.Read(r, binary.BigEndian, &rest)
-		parts := splitNullN(rest, encoding, 2)
-		frame.Description = string(reencode(parts[0], encoding))
-		frame.Text = string(reencode(parts[1], encoding))
-
-		return frame, nil
+		return readTXXXFrame(r, header, headerSize), nil
 	case "WXXX":
-		var encoding Encoding
-		frame := UserDefinedURLLinkFrame{FrameHeader: header}
-		binary.Read(r, binary.BigEndian, &encoding)
-		rest := make([]byte, headerSize-1)
-		binary.Read(r, binary.BigEndian, &rest)
-		parts := splitNullN(rest, encoding, 2)
-		frame.Description = string(reencode(parts[0], encoding))
-		frame.URL = string(iso88591ToUTF8(parts[1]))
-
-		return frame, nil
+		return readWXXXFrame(r, header, headerSize), nil
 	case "UFID":
-		frame := UniqueFileIdentifierFrame{FrameHeader: header}
-		rest := make([]byte, headerSize)
-		binary.Read(r, binary.BigEndian, &rest)
-		parts := bytes.SplitN(rest, []byte{0}, 2)
-		frame.Owner = string(reencode(parts[0], iso88591))
-		frame.Identifier = parts[1]
-
-		return frame, nil
+		return readUFIDFrame(r, header, headerSize), nil
 	case "COMM":
-		frame := CommentFrame{FrameHeader: header}
-		var (
-			encoding Encoding
-			language [3]byte
-			rest     []byte
-		)
-		rest = make([]byte, headerSize-4)
-
-		binary.Read(r, binary.BigEndian, &encoding)
-		binary.Read(r, binary.BigEndian, &language)
-		binary.Read(r, binary.BigEndian, &rest)
-
-		parts := splitNullN(rest, encoding, 2)
-
-		frame.Language = string(language[:])
-		frame.Description = string(reencode(parts[0], encoding))
-		frame.Text = string(reencode(parts[1], encoding))
-
-		return frame, nil
+		return readCOMMFrame(r, header, headerSize), nil
 	default:
-		fmt.Println(header.ID)
 		r.Read(make([]byte, headerSize))
 
 		return UnsupportedFrame{header}, nil
 	}
-
-	panic("unsupported frame")
 }
 
-func iso88591ToUTF8(input []byte) []byte {
-	// - ISO-8859-1 bytes match Unicode code points
-	// - All runes <128 correspond to ASCII, same as in UTF-8
-	// - All runes >128 in ISO-8859-1 encode as 2 bytes in UTF-8
-	res := make([]byte, len(input)*2)
+func readTXXXFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
+	var encoding Encoding
+	frame := UserTextInformationFrame{FrameHeader: header}
+	binary.Read(r, binary.BigEndian, &encoding)
+	rest := make([]byte, headerSize-1)
+	binary.Read(r, binary.BigEndian, &rest)
+	parts := splitNullN(rest, encoding, 2)
+	frame.Description = string(reencode(parts[0], encoding))
+	frame.Text = string(reencode(parts[1], encoding))
 
-	var j int
-	for _, b := range input {
-		if b <= 128 {
-			res[j] = b
-			j += 1
-		} else {
-			if b >= 192 {
-				res[j] = 195
-				res[j+1] = b - 64
-			} else {
-				res[j] = 194
-				res[j+1] = b
-			}
-			j += 2
-		}
-	}
-
-	return res[:j]
+	return frame
 }
 
-type File struct {
-	f      *os.File
-	Header TagHeader
-	Frames map[FrameType][]Frame
+func readWXXXFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
+	var encoding Encoding
+	frame := UserDefinedURLLinkFrame{FrameHeader: header}
+	binary.Read(r, binary.BigEndian, &encoding)
+	rest := make([]byte, headerSize-1)
+	binary.Read(r, binary.BigEndian, &rest)
+	parts := splitNullN(rest, encoding, 2)
+	frame.Description = string(reencode(parts[0], encoding))
+	frame.URL = string(iso88591ToUTF8(parts[1]))
+
+	return frame
+}
+
+func readUFIDFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
+	frame := UniqueFileIdentifierFrame{FrameHeader: header}
+	rest := make([]byte, headerSize)
+	binary.Read(r, binary.BigEndian, &rest)
+	parts := bytes.SplitN(rest, []byte{0}, 2)
+	frame.Owner = string(reencode(parts[0], iso88591))
+	frame.Identifier = parts[1]
+
+	return frame
+}
+
+func readCOMMFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
+	frame := CommentFrame{FrameHeader: header}
+	var (
+		encoding Encoding
+		language [3]byte
+		rest     []byte
+	)
+	rest = make([]byte, headerSize-4)
+
+	binary.Read(r, binary.BigEndian, &encoding)
+	binary.Read(r, binary.BigEndian, &language)
+	binary.Read(r, binary.BigEndian, &rest)
+
+	parts := splitNullN(rest, encoding, 2)
+
+	frame.Language = string(language[:])
+	frame.Description = string(reencode(parts[0], encoding))
+	frame.Text = string(reencode(parts[1], encoding))
+
+	return frame
 }
 
 func New(file *os.File) *File {
 	return &File{
 		f:      file,
-		Frames: make(map[FrameType][]Frame),
+		Frames: make(FramesMap),
 	}
 }
 
+// Parse parses the file's tags.
 func (f *File) Parse() error {
 	header, err := readHeader(f.f)
 	if err != nil {
@@ -537,6 +599,7 @@ func (f *File) Parse() error {
 		f.Frames[frame.ID()] = append(f.Frames[frame.ID()], frame)
 	}
 
+	f.hasTags = true
 	return nil
 }
 
@@ -560,7 +623,27 @@ func (f *File) Title() string {
 	return f.GetTextFrame("TIT2")
 }
 
+func (f *File) SetTitle(title string) {
+	f.SetTextFrame("TIT2", title)
+}
+
+func (f *File) SetTextFrame(name FrameType, value string) {
+	if name[0] != 'T' || name == "TXXX" {
+		panic("not a valid text frame name: " + name)
+	}
+
+	frames, ok := f.Frames[name]
+	if !ok {
+		frames = make([]Frame, 1)
+	}
+	frame := frames[0].(TextInformationFrame)
+	frame.Text = value
+	frames[0] = frame
+}
+
 func (f *File) Length() time.Duration {
+	// TODO if TLEN frame doesn't exist determine the length by
+	// parsing the underlying audio file
 	return time.Duration(f.GetTextFrameAsNumber("TLEN")) * time.Millisecond
 }
 
@@ -576,7 +659,14 @@ func (f *File) Year() int {
 	return f.GetTextFrameAsNumber("TYER")
 }
 
+// GetTextFrame returns the text frame specified by name. If it is not
+// a valid text frame name (i.e. it does not start with a T or is
+// named TXXX), GetTextFrame will panic.
 func (f *File) GetTextFrame(name FrameType) string {
+	if name[0] != 'T' || name == "TXXX" {
+		panic("not a valid text frame name: " + name)
+	}
+
 	frame, ok := f.Frames[name]
 	if !ok {
 		return ""
@@ -606,13 +696,305 @@ func (f *File) GetTextFrameAsSlice(name FrameType) []string {
 
 // TODO all the other methods
 
+func (f *File) CustomFrames() []UserTextInformationFrame {
+	res := make([]UserTextInformationFrame, len(f.Frames["TXXX"]))
+	for i, frame := range f.Frames["TXXX"] {
+		res[i] = frame.(UserTextInformationFrame)
+	}
+
+	return res
+}
+
+// Save saves the tags to the file. If the changed tags fit into the
+// existing file, they will be overwritten in place. Otherwise a new
+// file will be created and moved over the old file.
+func (f *File) Save() error {
+	framesSize := f.Frames.size()
+
+	if f.hasTags && f.Header.Size >= framesSize {
+		log.Println("Writing in-place")
+
+		// The file already has tags and there's enough room to write
+		// ours.
+
+		header := generateHeader(f.Header.Size)
+
+		_, err := f.f.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+
+		_, err = f.f.Write(header)
+		if err != nil {
+			return err
+		}
+
+		_, err = f.Frames.WriteTo(f.f)
+		if err != nil {
+			return err
+		}
+
+		// Blank out remainder of previous tags
+		_, err = f.f.Write(make([]byte, f.Header.Size-framesSize))
+		return err
+	} else {
+		log.Println("Writing new file")
+		// We have to create a new file
+
+		newFile, err := ioutil.TempFile("", "id3")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(newFile.Name())
+
+		_, err = f.WriteTo(newFile)
+		if err != nil {
+			return err
+		}
+
+		// We successfully generated a new file, so replace the old
+		// one with it.
+		err = truncate(f.f)
+		if err != nil {
+			return err
+		}
+
+		_, err = newFile.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(f.f, newFile)
+		if err != nil {
+			return err
+		}
+
+		// TODO consider padding here
+		f.Header.Size = framesSize
+		return nil
+	}
+}
+
+func truncate(f *os.File) error {
+	err := f.Truncate(0)
+	if err != nil {
+		return err
+	}
+	_, err = f.Seek(0, 0)
+	return err
+}
+
+func generateHeader(size int) []byte {
+	buf := bytes.NewBuffer(nil)
+
+	size = synchsafeInt(size)
+
+	writeMany(buf,
+		id3byte,
+		versionByte,
+		nul, // TODO flags
+		intToBytes(size),
+	)
+
+	return buf.Bytes()
+}
+
+func (fm FramesMap) size() int {
+	size := 0
+	for _, frames := range fm {
+		for _, frame := range frames {
+			size += frame.size()
+		}
+	}
+
+	return size
+}
+
+func (fm FramesMap) WriteTo(w io.Writer) (n int64, err error) {
+	for _, frames := range fm {
+		for _, frame := range frames {
+			nw, err := frame.WriteTo(w)
+			n += nw
+			if err != nil {
+				return n, err
+			}
+		}
+	}
+
+	return
+}
+
+func (f *File) WriteTo(w io.Writer) (int64, error) {
+	var n int64
+	header := generateHeader(f.Frames.size())
+	n1, err := w.Write(header)
+	n += int64(n1)
+	if err != nil {
+		return n, err
+	}
+
+	n2, err := f.Frames.WriteTo(w)
+	n += int64(n2)
+	if err != nil {
+		return n, err
+	}
+
+	seekTo := int64(0)
+	if f.hasTags {
+		seekTo = int64(f.Header.Size)
+	}
+
+	_, err = f.f.Seek(seekTo, 0)
+	if err != nil {
+		return n, err
+	}
+
+	// TODO write padding
+
+	// Copy audio data
+	n3, err := io.Copy(w, f.f)
+	n += int64(n3)
+	return n, err
+}
+
+func writeMany(w io.Writer, data ...[]byte) (int64, error) {
+	n := 0
+	for _, data := range data {
+		m, err := w.Write(data)
+		n += m
+		if err != nil {
+			return int64(n), err
+		}
+	}
+
+	return int64(n), nil
+}
+
+func desynchsafeInt(b [4]byte) int {
+	return int(b[0]<<23) | int(b[1]<<15) | int(b[2])<<7 | int(b[3])
+}
+
+func synchsafeInt(i int) int {
+	return (i & 0x7f) |
+		((i & 0x3f80) << 1) |
+		((i & 0x1fc000) << 2) |
+		((i & 0xfe0000) << 3)
+}
+
+func intToBytes(i int) []byte {
+	return []byte{
+		byte(i & 0xff000000 >> 24),
+		byte(i & 0xff0000 >> 16),
+		byte(i & 0xff00 >> 8),
+		byte(i & 0xff),
+	}
+}
+
+func splitNullN(data []byte, encoding Encoding, n int) [][]byte {
+	delim := encoding.terminator()
+	return bytes.SplitN(data, delim, n)
+}
+
+func reencode(b []byte, encoding Encoding) []byte {
+	// TODO: truncate after null byte
+	// FIXME: strip trailing null byte
+	var ret []byte
+	switch encoding {
+	case utf16bom:
+		translator, err := charset.TranslatorFrom("UTF16")
+		if err != nil {
+			// FIXME return an error
+			panic(err)
+		}
+
+		_, cdata, err := translator.Translate(b, true)
+		if err != nil {
+			// FIXME return an error
+			panic(err)
+		}
+		ret = make([]byte, len(cdata))
+		copy(ret, cdata)
+
+		return ret
+	case utf16be:
+		translator, err := charset.TranslatorFrom("UTF16BE")
+		if err != nil {
+			// FIXME return an error
+			panic(err)
+		}
+
+		_, cdata, err := translator.Translate(b, true)
+		if err != nil {
+			// FIXME return an error
+			panic(err)
+		}
+		ret = make([]byte, len(cdata))
+		copy(ret, cdata)
+
+		return ret
+	case utf8:
+		ret = make([]byte, len(b))
+		copy(ret, b)
+		return ret
+	case iso88591:
+		return iso88591ToUTF8(b)
+	}
+	panic("unsupported")
+}
+
+func iso88591ToUTF8(input []byte) []byte {
+	// - ISO-8859-1 bytes match Unicode code points
+	// - All runes <128 correspond to ASCII, same as in UTF-8
+	// - All runes >128 in ISO-8859-1 encode as 2 bytes in UTF-8
+	res := make([]byte, len(input)*2)
+
+	var j int
+	for _, b := range input {
+		if b <= 128 {
+			res[j] = b
+			j += 1
+		} else {
+			if b >= 192 {
+				res[j] = 195
+				res[j+1] = b - 64
+			} else {
+				res[j] = 194
+				res[j+1] = b
+			}
+			j += 2
+		}
+	}
+
+	return res[:j]
+}
+
+func utf8ToISO88591(input []byte) []byte {
+	res := make([]byte, len(input))
+	i := 0
+
+	for j := 0; j < len(input); j++ {
+		if input[j] <= 128 {
+			res[i] = input[j]
+		} else {
+			if input[j] == 195 {
+				res[i] = input[j+1] + 64
+			} else {
+				res[i] = input[j+1]
+			}
+			j++
+		}
+		i++
+	}
+
+	return res[:i]
+}
+
 func main() {
 	file := "test.mp3"
 	if len(os.Args) > 1 {
 		file = os.Args[1]
 	}
 
-	f, err := os.Open(file)
+	f, err := os.OpenFile(file, os.O_RDWR, 0)
 	if err != nil {
 		panic(err)
 	}
@@ -623,8 +1005,8 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Album:", tags.Album())
-	fmt.Println("Title:", tags.Title())
-	fmt.Println("Length:", tags.Length())
-	fmt.Println("Date:", tags.GetTextFrame("TDAT"))
+	// tags.SetTitle("This is a really long title with a moderate amount of unicode: äöü")
+
+	fmt.Println(tags.Save())
+
 }

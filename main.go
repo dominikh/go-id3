@@ -208,10 +208,12 @@ type UnsupportedFrame struct {
 }
 
 type File struct {
-	f       *os.File
-	hasTags bool
-	Header  TagHeader
-	Frames  FramesMap
+	f           *os.File
+	tagReader   io.ReadSeeker
+	audioReader io.ReadSeeker
+	hasTags     bool
+	Header      TagHeader
+	Frames      FramesMap
 }
 
 func (f FrameType) String() string {
@@ -585,10 +587,16 @@ func (f *File) Parse() error {
 		return err
 	}
 
-	f.Header = header
+	stat, err := f.f.Stat()
+	if err != nil {
+		return err
+	}
 
+	f.Header = header
+	f.tagReader = io.NewSectionReader(f.f, 0, int64(header.Size))
+	f.audioReader = io.NewSectionReader(f.f, int64(header.Size), stat.Size()-int64(header.Size))
 	for {
-		frame, err := readFrame(f.f)
+		frame, err := readFrame(f.tagReader)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -838,12 +846,7 @@ func (f *File) WriteTo(w io.Writer) (int64, error) {
 		return n, err
 	}
 
-	seekTo := int64(0)
-	if f.hasTags {
-		seekTo = int64(f.Header.Size)
-	}
-
-	_, err = f.f.Seek(seekTo, 0)
+	_, err = f.audioReader.Seek(0, 0)
 	if err != nil {
 		return n, err
 	}
@@ -851,7 +854,7 @@ func (f *File) WriteTo(w io.Writer) (int64, error) {
 	// TODO write padding
 
 	// Copy audio data
-	n3, err := io.Copy(w, f.f)
+	n3, err := io.Copy(w, f.audioReader)
 	n += int64(n3)
 	return n, err
 }

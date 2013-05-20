@@ -793,6 +793,7 @@ func (f *File) Save() error {
 			return err
 		}
 
+		f.hasTags = true
 		f.Header.Size = framesSize + Padding
 		return nil
 	}

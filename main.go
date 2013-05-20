@@ -216,6 +216,7 @@ type UnsupportedFrame struct {
 
 type File struct {
 	f           *os.File
+	fileSize    int64
 	tagReader   io.ReadSeeker
 	audioReader io.ReadSeeker
 	hasTags     bool
@@ -585,20 +586,21 @@ func readCOMMFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
 	return frame
 }
 
-func New(file *os.File) *File {
-	return &File{
-		f:      file,
-		Frames: make(FramesMap),
+func New(file *os.File) (*File, error) {
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, err
 	}
+
+	return &File{
+		f:        file,
+		fileSize: stat.Size(),
+		Frames:   make(FramesMap),
+	}, nil
 }
 
 // Parse parses the file's tags.
 func (f *File) Parse() error {
-	stat, err := f.f.Stat()
-	if err != nil {
-		return err
-	}
-
 	header, n, err := readHeader(f.f)
 	f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
 	f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
@@ -766,13 +768,24 @@ func (f *File) Save() error {
 		log.Println("Writing new file")
 		// We have to create a new file
 
-		newFile, err := ioutil.TempFile("", "id3")
-		if err != nil {
-			return err
-		}
-		defer os.Remove(newFile.Name())
+		var buf io.ReadWriter
 
-		_, err = f.WriteTo(newFile)
+		// Work in memory If the old file was smaller than 10MiB, use
+		// a temporary file otherwise.
+		if f.fileSize < 10*1024*1024 {
+			log.Println("Working in memory")
+			buf = bytes.NewBuffer(nil)
+		} else {
+			log.Println("Using a temporary file")
+			newFile, err := ioutil.TempFile("", "id3")
+			if err != nil {
+				return err
+			}
+			defer os.Remove(newFile.Name())
+			buf = newFile
+		}
+
+		_, err := f.WriteTo(buf)
 		if err != nil {
 			return err
 		}
@@ -784,11 +797,7 @@ func (f *File) Save() error {
 			return err
 		}
 
-		_, err = newFile.Seek(0, 0)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(f.f, newFile)
+		_, err = io.Copy(f.f, buf)
 		if err != nil {
 			return err
 		}
@@ -1023,7 +1032,10 @@ func main() {
 		panic(err)
 	}
 
-	tags := New(f)
+	tags, err := New(f)
+	if err != nil {
+		panic(err)
+	}
 	err = tags.Parse()
 	if _, ok := err.(NotATagHeader); err != nil && !ok {
 		panic(err)

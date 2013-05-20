@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"code.google.com/p/go-charset/charset"
 	_ "code.google.com/p/go-charset/data"
 	"encoding/binary"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	utf16p "unicode/utf16"
 )
 
 var _ = spew.Dump
@@ -839,38 +839,8 @@ func reencode(b []byte, encoding Encoding) []byte {
 	// FIXME: strip trailing null byte
 	var ret []byte
 	switch encoding {
-	case utf16bom:
-		translator, err := charset.TranslatorFrom("UTF16")
-		if err != nil {
-			// FIXME return an error
-			panic(err)
-		}
-
-		_, cdata, err := translator.Translate(b, true)
-		if err != nil {
-			// FIXME return an error
-			panic(err)
-		}
-		ret = make([]byte, len(cdata))
-		copy(ret, cdata)
-
-		return ret
-	case utf16be:
-		translator, err := charset.TranslatorFrom("UTF16BE")
-		if err != nil {
-			// FIXME return an error
-			panic(err)
-		}
-
-		_, cdata, err := translator.Translate(b, true)
-		if err != nil {
-			// FIXME return an error
-			panic(err)
-		}
-		ret = make([]byte, len(cdata))
-		copy(ret, cdata)
-
-		return ret
+	case utf16bom, utf16be:
+		return utf16ToUTF8(b)
 	case utf8:
 		ret = make([]byte, len(b))
 		copy(ret, b)
@@ -879,6 +849,34 @@ func reencode(b []byte, encoding Encoding) []byte {
 		return iso88591ToUTF8(b)
 	}
 	panic("unsupported")
+}
+
+func utf16ToUTF8(input []byte) []byte {
+	// ID3v2 allows UTF-16 in two ways: With a BOM or as Big Endian.
+	// So if we have no Little Endian BOM, it has to be Big Endian
+	// either way.
+	bigEndian := true
+	if input[0] == 0xFF && input[1] == 0xFE {
+		bigEndian = false
+		input = input[2:]
+	} else if input[0] == 0xFE && input[1] == 0xFF {
+		input = input[2:]
+	}
+
+	uint16s := make([]uint16, len(input)/2)
+
+	i := 0
+	for j := 0; j < len(input); j += 2 {
+		if bigEndian {
+			uint16s[i] = uint16(input[j])<<8 | uint16(input[j+1])
+		} else {
+			uint16s[i] = uint16(input[j]) | uint16(input[j+1])<<8
+		}
+
+		i++
+	}
+
+	return []byte(string(utf16p.Decode(uint16s)))
 }
 
 func iso88591ToUTF8(input []byte) []byte {

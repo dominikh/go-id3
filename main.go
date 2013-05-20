@@ -697,6 +697,13 @@ func (f *File) Save() error {
 			return err
 		}
 
+		if newFile, ok := buf.(*os.File); ok {
+			_, err = newFile.Seek(0, 0)
+			if err != nil {
+				return err
+			}
+		}
+
 		_, err = io.Copy(f.f, buf)
 		if err != nil {
 			return err

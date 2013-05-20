@@ -1,6 +1,6 @@
 package main
 
-var FrameNames = map[string]string{
+var FrameNames = map[FrameType]string{
 	"AENC": "Audio encryption",
 	"APIC": "Attached picture",
 	"ASPI": "Audio seek point index",

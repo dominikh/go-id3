@@ -125,7 +125,7 @@ type File struct {
 }
 
 func (f FrameType) String() string {
-	v, ok := FrameNames[string(f)]
+	v, ok := FrameNames[f]
 	if ok {
 		return v
 	}

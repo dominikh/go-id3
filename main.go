@@ -40,6 +40,8 @@ var (
 	versionByte = []byte{4, 0}
 )
 
+const TimeFormat = "2006-01-02T15:04:05"
+
 var timeFormats = []string{
 	"2006-01-02T15:04:05",
 	"2006-01-02T15:04",
@@ -534,6 +536,16 @@ func (f *File) Parse() error {
 	return nil
 }
 
+
+// Clear removes all tags from the file.
+func (f *File) Clear() {
+	f.Frames = make(FramesMap)
+}
+
+func (f *File) RemoveFrames(name FrameType) {
+	delete(f.Frames, name)
+}
+
 func (f *File) Validate() error {
 	panic("not implemented")
 }
@@ -542,8 +554,24 @@ func (f *File) Album() string {
 	return f.GetTextFrame("TALB")
 }
 
+func (f *File) SetAlbum(album string) {
+	f.SetTextFrame("TALB", album)
+}
+
+func (f *File) Artist() string {
+	return f.GetTextFrame("TPE1") // FIXME <IDv2.4
+}
+
+func (f *File) SetArtist(artist string) {
+	f.SetTextFrame("TPE1", artist)
+}
+
 func (f *File) BPM() int {
 	return f.GetTextFrameNumber("TBPM")
+}
+
+func (f *File) SetBPM(bpm int) {
+	f.SetTextFrameNumber("TBPM", bpm)
 }
 
 func (f *File) Composers() []string {
@@ -568,12 +596,25 @@ func (f *File) Publisher() string {
 	return f.GetTextFrame("TPUB")
 }
 
+func (f *File) SetPublisher(publisher string) {
+	f.SetTextFrame("TPUB", publisher)
+}
+
 func (f *File) Owner() string {
 	return f.GetTextFrame("TOWN")
 }
 
-func (f *File) Year() int {
-	return f.GetTextFrameNumber("TYER")
+func (f *File) RecordingTime() time.Time {
+	return f.GetTextFrameTime("TDRC")
+}
+
+func (f *File) SetRecordingTime(t time.Time) {
+	f.SetTextFrameTime("TDRC", t)
+}
+
+func (f *File) HasFrame(name FrameType) bool {
+	_, ok := f.Frames[name]
+	return ok
 }
 
 // GetTextFrame returns the text frame specified by name. If it is not
@@ -611,6 +652,21 @@ func (f *File) GetTextFrameSlice(name FrameType) []string {
 	return strings.Split(s, "/")
 }
 
+func (f *File) GetTextFrameTime(name FrameType) time.Time {
+	s := f.GetTextFrame(name)
+	if s == "" {
+		return time.Time{}
+	}
+
+	t, err := parseTime(s)
+	if err != nil {
+		// FIXME figure out a way to signal format errors
+		panic(err)
+	}
+
+	return t
+}
+
 func (f *File) SetTextFrame(name FrameType, value string) {
 	if name[0] != 'T' || name == "TXXX" {
 		panic("not a valid text frame name: " + name)
@@ -636,6 +692,10 @@ func (f *File) SetTextFrameNumber(name FrameType, value int) {
 
 func (f *File) SetTextFrameSlice(name FrameType, value []string) {
 	f.SetTextFrame(name, strings.Join(value, "/"))
+}
+
+func (f *File) SetTextFrameTime(name FrameType, value time.Time) {
+	f.SetTextFrame(name, value.Format(TimeFormat))
 }
 
 // TODO all the other methods

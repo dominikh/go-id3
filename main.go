@@ -40,6 +40,15 @@ var (
 	versionByte = []byte{4, 0}
 )
 
+var timeFormats = []string{
+	"2006-01-02T15:04:05",
+	"2006-01-02T15:04",
+	"2006-01-02T15",
+	"2006-01-02",
+	"2006-01",
+	"2006",
+}
+
 // TODO: ID3v2 extended header
 // TODO: unsynchronisation
 
@@ -932,6 +941,17 @@ func utf8ToISO88591(input []byte) []byte {
 	}
 
 	return res[:i]
+}
+
+func parseTime(input string) (res time.Time, err error) {
+	for _, format := range timeFormats {
+		res, err = time.Parse(format, input)
+		if err == nil {
+			break
+		}
+	}
+
+	return
 }
 
 func main() {

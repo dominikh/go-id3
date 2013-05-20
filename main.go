@@ -18,6 +18,9 @@ import (
 
 var _ = spew.Dump
 
+// The amount of padding that will be added after the last frame
+const Padding = 1024
+
 const (
 	iso88591 = 0
 	utf16bom = 1
@@ -414,7 +417,7 @@ func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
 
 // readHeader reads an ID3v2 header. It expects the reader to be
 // seeked to the beginning of the header.
-func readHeader(r io.Reader) (TagHeader, error) {
+func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 	var (
 		bytes struct {
 			Magic   [3]byte
@@ -422,12 +425,11 @@ func readHeader(r io.Reader) (TagHeader, error) {
 			Flags   byte
 			Size    [4]byte
 		}
-		header TagHeader
 	)
 
 	binary.Read(r, binary.BigEndian, &bytes.Magic)
 	if bytes.Magic != [3]byte{0x49, 0x44, 0x33} {
-		return TagHeader{}, NotATagHeader{bytes.Magic}
+		return TagHeader{}, 3, NotATagHeader{bytes.Magic}
 	}
 	binary.Read(r, binary.BigEndian, &bytes.Version)
 	binary.Read(r, binary.BigEndian, &bytes.Flags)
@@ -437,7 +439,7 @@ func readHeader(r io.Reader) (TagHeader, error) {
 	header.Flags = HeaderFlags(bytes.Flags)
 	header.Size = desynchsafeInt(bytes.Size)
 
-	return header, nil
+	return header, 10, nil
 }
 
 func readFrame(r io.Reader) (Frame, error) {
@@ -474,8 +476,6 @@ func readFrame(r io.Reader) (Frame, error) {
 	if header.id[0] == 0 {
 		return nil, io.EOF
 	}
-
-	// TODO what if there's no padding and we're reading audio data?
 
 	if header.id[0] == 'T' && header.id != "TXXX" {
 		var encoding Encoding
@@ -582,7 +582,7 @@ func New(file *os.File) *File {
 
 // Parse parses the file's tags.
 func (f *File) Parse() error {
-	header, err := readHeader(f.f)
+	header, n, err := readHeader(f.f)
 	if err != nil {
 		return err
 	}
@@ -593,7 +593,7 @@ func (f *File) Parse() error {
 	}
 
 	f.Header = header
-	f.tagReader = io.NewSectionReader(f.f, 0, int64(header.Size))
+	f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
 	f.audioReader = io.NewSectionReader(f.f, int64(header.Size), stat.Size()-int64(header.Size))
 	for {
 		frame, err := readFrame(f.tagReader)

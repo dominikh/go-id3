@@ -674,7 +674,7 @@ func (f *File) Save() error {
 		// a temporary file otherwise.
 		if f.fileSize < 10*1024*1024 {
 			log.Println("Working in memory")
-			buf = bytes.NewBuffer(nil)
+			buf = new(bytes.Buffer)
 		} else {
 			log.Println("Using a temporary file")
 			newFile, err := ioutil.TempFile("", "id3")
@@ -718,7 +718,7 @@ func truncate(f *os.File) error {
 }
 
 func generateHeader(size int) []byte {
-	buf := bytes.NewBuffer(nil)
+	buf := new(bytes.Buffer)
 
 	size = synchsafeInt(size)
 

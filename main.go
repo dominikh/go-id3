@@ -534,11 +534,11 @@ func (f *File) Album() string {
 }
 
 func (f *File) BPM() int {
-	return f.GetTextFrameAsNumber("TBPM")
+	return f.GetTextFrameNumber("TBPM")
 }
 
 func (f *File) Composers() []string {
-	return f.GetTextFrameAsSlice("TCOM")
+	return f.GetTextFrameSlice("TCOM")
 }
 
 func (f *File) Title() string {
@@ -571,7 +571,7 @@ func (f *File) SetTextFrame(name FrameType, value string) {
 func (f *File) Length() time.Duration {
 	// TODO if TLEN frame doesn't exist determine the length by
 	// parsing the underlying audio file
-	return time.Duration(f.GetTextFrameAsNumber("TLEN")) * time.Millisecond
+	return time.Duration(f.GetTextFrameNumber("TLEN")) * time.Millisecond
 }
 
 func (f *File) Publisher() string {
@@ -583,7 +583,7 @@ func (f *File) Owner() string {
 }
 
 func (f *File) Year() int {
-	return f.GetTextFrameAsNumber("TYER")
+	return f.GetTextFrameNumber("TYER")
 }
 
 // GetTextFrame returns the text frame specified by name. If it is not
@@ -602,7 +602,7 @@ func (f *File) GetTextFrame(name FrameType) string {
 	return frame[0].(TextInformationFrame).Text
 }
 
-func (f *File) GetTextFrameAsNumber(name FrameType) int {
+func (f *File) GetTextFrameNumber(name FrameType) int {
 	s := f.GetTextFrame(name)
 	if s == "" {
 		return 0
@@ -612,7 +612,7 @@ func (f *File) GetTextFrameAsNumber(name FrameType) int {
 	return i
 }
 
-func (f *File) GetTextFrameAsSlice(name FrameType) []string {
+func (f *File) GetTextFrameSlice(name FrameType) []string {
 	s := f.GetTextFrame(name)
 	if s == "" {
 		return nil
@@ -946,10 +946,19 @@ func main() {
 		panic(err)
 	}
 
-	tags.SetTitle("A completely new title!")
+	// tags.SetTitle("A completely new title!")
 
-	// tags.SetTitle("This is a really long title with a moderate amount of unicode: äöü")
-
+	tags.SetTitle("This is a really long title with a moderate amount of unicode: äöü – And now even more! Yay. Mhm.")
+	// fmt.Println(tags.Title())
 	fmt.Println(tags.Save())
+
+	// tags.SetTitle("a")
+	// tags.Save()
+
+	// tags.SetTitle("ab")
+	// tags.Save()
+
+	// tags.SetTitle("abc")
+	// tags.Save()
 
 }

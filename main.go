@@ -19,7 +19,7 @@ import (
 var _ = spew.Dump
 
 // The amount of padding that will be added after the last frame
-const Padding = 1024
+const Padding = 1024 * 1024
 
 const (
 	iso88591 = 0
@@ -793,8 +793,7 @@ func (f *File) Save() error {
 			return err
 		}
 
-		// TODO consider padding here
-		f.Header.Size = framesSize
+		f.Header.Size = framesSize + Padding
 		return nil
 	}
 }
@@ -850,7 +849,7 @@ func (fm FramesMap) WriteTo(w io.Writer) (n int64, err error) {
 
 func (f *File) WriteTo(w io.Writer) (int64, error) {
 	var n int64
-	header := generateHeader(f.Frames.size())
+	header := generateHeader(f.Frames.size() + Padding)
 	n1, err := w.Write(header)
 	n += int64(n1)
 	if err != nil {
@@ -863,16 +862,20 @@ func (f *File) WriteTo(w io.Writer) (int64, error) {
 		return n, err
 	}
 
+	n1, err = w.Write(make([]byte, Padding))
+	n += int64(n1)
+	if err != nil {
+		return n, err
+	}
+
 	_, err = f.audioReader.Seek(0, 0)
 	if err != nil {
 		return n, err
 	}
 
-	// TODO write padding
-
 	// Copy audio data
-	n3, err := io.Copy(w, f.audioReader)
-	n += int64(n3)
+	n2, err = io.Copy(w, f.audioReader)
+	n += int64(n2)
 	return n, err
 }
 

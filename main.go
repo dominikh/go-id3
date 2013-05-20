@@ -655,10 +655,15 @@ func (f *File) SetTextFrame(name FrameType, value string) {
 	frames, ok := f.Frames[name]
 	if !ok {
 		frames = make([]Frame, 1)
+		f.Frames[name] = frames
 	}
-	frame := frames[0].(TextInformationFrame)
-	frame.Text = value
-	frames[0] = frame
+	frames[0] = TextInformationFrame{
+		FrameHeader: FrameHeader{
+			id: name,
+		},
+		Text: value,
+	}
+	// TODO what about flags and preserving them?
 }
 
 func (f *File) Length() time.Duration {

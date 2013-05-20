@@ -19,7 +19,7 @@ import (
 var _ = spew.Dump
 
 // The amount of padding that will be added after the last frame
-const Padding = 1024 * 1024
+const Padding = 1024
 
 const (
 	iso88591 = 0

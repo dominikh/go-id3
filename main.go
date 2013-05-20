@@ -843,32 +843,35 @@ func (fm FramesMap) WriteTo(w io.Writer) (n int64, err error) {
 
 func (f *File) WriteTo(w io.Writer) (int64, error) {
 	var n int64
-	header := generateHeader(f.Frames.size() + Padding)
-	n1, err := w.Write(header)
-	n += int64(n1)
-	if err != nil {
-		return n, err
-	}
 
-	n2, err := f.Frames.WriteTo(w)
-	n += int64(n2)
-	if err != nil {
-		return n, err
-	}
+	if len(f.Frames) > 0 {
+		header := generateHeader(f.Frames.size() + Padding)
+		n1, err := w.Write(header)
+		n += int64(n1)
+		if err != nil {
+			return n, err
+		}
 
-	n1, err = w.Write(make([]byte, Padding))
-	n += int64(n1)
-	if err != nil {
-		return n, err
-	}
+		n2, err := f.Frames.WriteTo(w)
+		n += int64(n2)
+		if err != nil {
+			return n, err
+		}
 
-	_, err = f.audioReader.Seek(0, 0)
-	if err != nil {
-		return n, err
+		n1, err = w.Write(make([]byte, Padding))
+		n += int64(n1)
+		if err != nil {
+			return n, err
+		}
+
+		_, err = f.audioReader.Seek(0, 0)
+		if err != nil {
+			return n, err
+		}
 	}
 
 	// Copy audio data
-	n2, err = io.Copy(w, f.audioReader)
+	n2, err := io.Copy(w, f.audioReader)
 	n += int64(n2)
 	return n, err
 }

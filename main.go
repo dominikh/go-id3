@@ -154,6 +154,10 @@ type NotATagHeader struct {
 	Magic [3]byte
 }
 
+type UnsupportedVersion struct {
+	Version Version
+}
+
 type TagHeader struct {
 	Version Version
 	Flags   HeaderFlags
@@ -255,8 +259,12 @@ func (e Encoding) terminator() []byte {
 // TODO: HeaderFlags.String()
 // TODO: FrameFlags.String()
 
-func (NotATagHeader) Error() string {
-	return "Not an ID3v2 header"
+func (err NotATagHeader) Error() string {
+	return fmt.Sprintf("Not an ID3v2 header: %v", err.Magic)
+}
+
+func (err UnsupportedVersion) Error() string {
+	return fmt.Sprintf("Unsupported version: %s", err.Version)
 }
 
 func (f HeaderFlags) Unsynchronisation() bool {
@@ -432,10 +440,14 @@ func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 		return TagHeader{}, 3, NotATagHeader{bytes.Magic}
 	}
 	binary.Read(r, binary.BigEndian, &bytes.Version)
+	version := Version(int16(bytes.Version[0])<<8 | int16(bytes.Version[1]))
+	if bytes.Version[0] != 4 {
+		return TagHeader{}, 5, UnsupportedVersion{version}
+	}
 	binary.Read(r, binary.BigEndian, &bytes.Flags)
 	binary.Read(r, binary.BigEndian, &bytes.Size)
 
-	header.Version = Version(int16(bytes.Version[0])<<8 | int16(bytes.Version[1]))
+	header.Version = version
 	header.Flags = HeaderFlags(bytes.Flags)
 	header.Size = desynchsafeInt(bytes.Size)
 
@@ -582,19 +594,19 @@ func New(file *os.File) *File {
 
 // Parse parses the file's tags.
 func (f *File) Parse() error {
-	header, n, err := readHeader(f.f)
-	if err != nil {
-		return err
-	}
-
 	stat, err := f.f.Stat()
 	if err != nil {
 		return err
 	}
 
-	f.Header = header
+	header, n, err := readHeader(f.f)
 	f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
 	f.audioReader = io.NewSectionReader(f.f, int64(header.Size), stat.Size()-int64(header.Size))
+	if err != nil {
+		return err
+	}
+
+	f.Header = header
 	for {
 		frame, err := readFrame(f.tagReader)
 		if err != nil {
@@ -1004,9 +1016,11 @@ func main() {
 
 	tags := New(f)
 	err = tags.Parse()
-	if err != nil {
+	if _, ok := err.(NotATagHeader); err != nil && !ok {
 		panic(err)
 	}
+
+	tags.SetTitle("A completely new title!")
 
 	// tags.SetTitle("This is a really long title with a moderate amount of unicode: äöü")
 

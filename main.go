@@ -549,25 +549,6 @@ func (f *File) SetTitle(title string) {
 	f.SetTextFrame("TIT2", title)
 }
 
-func (f *File) SetTextFrame(name FrameType, value string) {
-	if name[0] != 'T' || name == "TXXX" {
-		panic("not a valid text frame name: " + name)
-	}
-
-	frames, ok := f.Frames[name]
-	if !ok {
-		frames = make([]Frame, 1)
-		f.Frames[name] = frames
-	}
-	frames[0] = TextInformationFrame{
-		FrameHeader: FrameHeader{
-			id: name,
-		},
-		Text: value,
-	}
-	// TODO what about flags and preserving them?
-}
-
 func (f *File) Length() time.Duration {
 	// TODO if TLEN frame doesn't exist determine the length by
 	// parsing the underlying audio file
@@ -619,6 +600,33 @@ func (f *File) GetTextFrameSlice(name FrameType) []string {
 	}
 
 	return strings.Split(s, "/")
+}
+
+func (f *File) SetTextFrame(name FrameType, value string) {
+	if name[0] != 'T' || name == "TXXX" {
+		panic("not a valid text frame name: " + name)
+	}
+
+	frames, ok := f.Frames[name]
+	if !ok {
+		frames = make([]Frame, 1)
+		f.Frames[name] = frames
+	}
+	frames[0] = TextInformationFrame{
+		FrameHeader: FrameHeader{
+			id: name,
+		},
+		Text: value,
+	}
+	// TODO what about flags and preserving them?
+}
+
+func (f *File) SetTextFrameNumber(name FrameType, value int) {
+	f.SetTextFrame(name, strconv.Itoa(value))
+}
+
+func (f *File) SetTextFrameSlice(name FrameType, value []string) {
+	f.SetTextFrame(name, strings.Join(value, "/"))
 }
 
 // TODO all the other methods

@@ -144,7 +144,7 @@ func (e Encoding) String() string {
 	case utf8:
 		return "UTF-8"
 	default:
-		return fmt.Sprintf("%d", byte(e))
+		return fmt.Sprintf("Unknown encoding %d", byte(e))
 	}
 }
 

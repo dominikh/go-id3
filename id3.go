@@ -295,17 +295,17 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	switch header.id {
 	case "TXXX":
-		return readTXXXFrame(r, header, headerSize), nil
+		return readTXXXFrame(r, header, headerSize)
 	case "WXXX":
-		return readWXXXFrame(r, header, headerSize), nil
+		return readWXXXFrame(r, header, headerSize)
 	case "UFID":
-		return readUFIDFrame(r, header, headerSize), nil
+		return readUFIDFrame(r, header, headerSize)
 	case "COMM":
-		return readCOMMFrame(r, header, headerSize), nil
+		return readCOMMFrame(r, header, headerSize)
 	default:
-		r.Read(make([]byte, headerSize))
+		_, err := r.Read(make([]byte, headerSize))
 
-		return UnsupportedFrame{header}, nil
+		return UnsupportedFrame{header}, err
 	}
 }
 
@@ -358,7 +358,8 @@ func (f *File) ParseHeader() error {
 	return nil
 }
 
-// Parse parses the file's tags.
+// Parse parses the file's tags. If you only want to parse the header,
+// use ParseHeader instead.
 func (f *File) Parse() error {
 	err := f.ParseHeader()
 	if err != nil {
@@ -434,7 +435,11 @@ func (f *File) upgrade() {
 			f.SetTextFrameSlice(name, strings.Split(f.GetTextFrame(name), "/"))
 		}
 	}
-	// TODO slash -> \x00 as value separator
+	// TODO EQUA → EQU2
+	// TODO IPL → TMCL, TIPL
+	// TODO RVAD → RVA2
+	// TODO TRDA → TDRL
+	// TODO TSIZ → /
 }
 
 // Clear removes all tags from the file.

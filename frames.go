@@ -278,44 +278,56 @@ func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
 	return 0, nil
 }
 
-func readTXXXFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
+func readTXXXFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, error) {
 	var encoding Encoding
 	frame := UserTextInformationFrame{FrameHeader: header}
-	binary.Read(r, binary.BigEndian, &encoding)
 	rest := make([]byte, headerSize-1)
-	binary.Read(r, binary.BigEndian, &rest)
+
+	err := readBinary(r, &encoding, &rest)
+	if err != nil {
+		return nil, err
+	}
 	parts := splitNullN(rest, encoding, 2)
 	frame.Description = string(reencode(parts[0], encoding))
 	frame.Text = string(reencode(parts[1], encoding))
 
-	return frame
+	return frame, nil
 }
 
-func readWXXXFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
+func readWXXXFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, error) {
 	var encoding Encoding
 	frame := UserDefinedURLLinkFrame{FrameHeader: header}
-	binary.Read(r, binary.BigEndian, &encoding)
 	rest := make([]byte, headerSize-1)
-	binary.Read(r, binary.BigEndian, &rest)
+
+	err := readBinary(r, &encoding, &rest)
+	if err != nil {
+		return nil, err
+	}
+
 	parts := splitNullN(rest, encoding, 2)
 	frame.Description = string(reencode(parts[0], encoding))
 	frame.URL = string(iso88591ToUTF8(parts[1]))
 
-	return frame
+	return frame, nil
 }
 
-func readUFIDFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
+func readUFIDFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, error) {
 	frame := UniqueFileIdentifierFrame{FrameHeader: header}
 	rest := make([]byte, headerSize)
-	binary.Read(r, binary.BigEndian, &rest)
+
+	err := binary.Read(r, binary.BigEndian, &rest)
+	if err != nil {
+		return nil, err
+	}
+
 	parts := bytes.SplitN(rest, []byte{0}, 2)
 	frame.Owner = string(reencode(parts[0], iso88591))
 	frame.Identifier = parts[1]
 
-	return frame
+	return frame, nil
 }
 
-func readCOMMFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
+func readCOMMFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, error) {
 	frame := CommentFrame{FrameHeader: header}
 	var (
 		encoding Encoding
@@ -324,9 +336,10 @@ func readCOMMFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
 	)
 	rest = make([]byte, headerSize-4)
 
-	binary.Read(r, binary.BigEndian, &encoding)
-	binary.Read(r, binary.BigEndian, &language)
-	binary.Read(r, binary.BigEndian, &rest)
+	err := readBinary(r, &encoding, &language, &rest)
+	if err != nil {
+		return nil, err
+	}
 
 	parts := splitNullN(rest, encoding, 2)
 
@@ -334,5 +347,5 @@ func readCOMMFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
 	frame.Description = string(reencode(parts[0], encoding))
 	frame.Text = string(reencode(parts[1], encoding))
 
-	return frame
+	return frame, nil
 }

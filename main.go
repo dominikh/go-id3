@@ -250,10 +250,19 @@ func (f FrameHeader) serialize(size int) []byte {
 }
 
 func (f TextInformationFrame) size() int {
+	if f.FrameHeader.ID() == "TRDA" {
+		return 0
+	}
+
 	return frameLength + len(f.Text) + 1
 }
 
 func (f TextInformationFrame) WriteTo(w io.Writer) (int64, error) {
+	if f.FrameHeader.ID() == "TRDA" {
+		Logging.Println("Skipping TRDA header")
+		return 0, nil
+	}
+
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		utf8byte,

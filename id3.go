@@ -798,6 +798,7 @@ func (f *File) CustomFrames() []UserTextInformationFrame {
 // existing file, they will be overwritten in place. Otherwise a new
 // file will be created and moved over the old file.
 func (f *File) Save() error {
+	f.SetTextFrameTime("TDTG", time.Now().UTC())
 	framesSize := f.Frames.size()
 
 	if f.hasTags && f.Header.Size >= framesSize && len(f.Frames) > 0 {
@@ -935,6 +936,7 @@ func (f *File) WriteTo(w io.Writer) (int64, error) {
 	var n int64
 
 	if len(f.Frames) > 0 {
+		f.SetTextFrameTime("TDTG", time.Now().UTC())
 		header := generateHeader(f.Frames.size() + Padding)
 		n1, err := w.Write(header)
 		n += int64(n1)

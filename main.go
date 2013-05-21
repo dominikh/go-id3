@@ -769,6 +769,7 @@ func (f *File) Save() error {
 			return err
 		}
 
+		f.Header.Version = 0x0400
 		// Blank out remainder of previous tags
 		_, err = f.f.Write(make([]byte, f.Header.Size-framesSize))
 		return err
@@ -819,6 +820,7 @@ func (f *File) Save() error {
 
 		f.hasTags = true
 		f.Header.Size = framesSize + Padding
+		f.Header.Version = 0x0400
 		return nil
 	}
 }

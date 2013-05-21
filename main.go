@@ -519,6 +519,20 @@ func New(file *os.File) (*File, error) {
 	}, nil
 }
 
+func Open(name string) (*File, error) {
+	f, err := os.OpenFile(name, os.O_RDWR, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := New(f)
+	return file, err
+}
+
+func (f *File) Close() error {
+	return f.f.Close()
+}
+
 // Parse parses the file's tags.
 func (f *File) Parse() error {
 	header, n, err := readHeader(f.f)

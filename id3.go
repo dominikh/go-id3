@@ -393,14 +393,14 @@ func (f *File) upgrade() {
 
 	// Upgrade Original Release Year to Original Release Time
 	if !f.HasFrame("TDOR") {
-		if f.HasFrame("TORY") {
+		if f.HasFrame("XDOR") {
+			Logging.Println("Replacing XDOR with TDOR")
+			panic("not implemented") // FIXME
+		} else if f.HasFrame("TORY") {
 			Logging.Println("Replacing TORY with TDOR")
 
 			year := f.GetTextFrameNumber("TORY")
 			f.SetOriginalReleaseTime(time.Date(year, 0, 0, 0, 0, 0, 0, time.UTC))
-		} else if f.HasFrame("XDOR") {
-			Logging.Println("Replacing XDOR with TDOR")
-			panic("not implemented") // FIXME
 		}
 	}
 

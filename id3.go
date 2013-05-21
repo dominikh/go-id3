@@ -184,8 +184,20 @@ func (v Version) String() string {
 	return fmt.Sprintf("ID3v2.%.1d.%.1d", v>>8, v&0xFF)
 }
 
+func readBinary(r io.Reader, args ...interface{}) (err error) {
+	for _, arg := range args {
+		err = binary.Read(r, binary.BigEndian, arg)
+		if err != nil {
+			break
+		}
+	}
+
+	return
+}
+
 // readHeader reads an ID3v2 header. It expects the reader to be
-// seeked to the beginning of the header.
+// seeked to the beginning of the header. When an error is returned, n
+// will always be zero.
 func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 	var (
 		bytes struct {
@@ -196,17 +208,17 @@ func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 		}
 	)
 
-	binary.Read(r, binary.BigEndian, &bytes.Magic)
+	err = readBinary(r, &bytes.Magic, &bytes.Version, &bytes.Flags, &bytes.Size)
+	if err != nil {
+		return header, 0, err
+	}
 	if bytes.Magic != [3]byte{0x49, 0x44, 0x33} {
 		return TagHeader{}, 3, notATagHeader{bytes.Magic}
 	}
-	binary.Read(r, binary.BigEndian, &bytes.Version)
 	version := Version(int16(bytes.Version[0])<<8 | int16(bytes.Version[1]))
 	if bytes.Version[0] != 4 {
 		return TagHeader{}, 5, UnsupportedVersion{version}
 	}
-	binary.Read(r, binary.BigEndian, &bytes.Flags)
-	binary.Read(r, binary.BigEndian, &bytes.Size)
 
 	header.Version = version
 	header.Flags = HeaderFlags(bytes.Flags)
@@ -229,9 +241,10 @@ func readFrame(r io.Reader) (Frame, error) {
 		header FrameHeader
 	)
 
-	binary.Read(r, binary.BigEndian, &headerBytes.ID)
-	binary.Read(r, binary.BigEndian, &headerBytes.Size)
-	binary.Read(r, binary.BigEndian, &headerBytes.Flags)
+	err := readBinary(r, &headerBytes.ID, &headerBytes.Size, &headerBytes.Flags)
+	if err != nil {
+		return nil, err
+	}
 
 	header.id = FrameType(headerBytes.ID[:])
 	header.flags = FrameFlags(int16(headerBytes.Flags[0])<<8 | int16(headerBytes.Flags[1]))
@@ -258,8 +271,10 @@ func readFrame(r io.Reader) (Frame, error) {
 		var encoding Encoding
 		frame := TextInformationFrame{FrameHeader: header}
 		information := make([]byte, headerSize-1)
-		binary.Read(r, binary.BigEndian, &encoding)
-		binary.Read(r, binary.BigEndian, &information)
+		err := readBinary(r, &encoding, &information)
+		if err != nil {
+			return nil, err
+		}
 
 		frame.Text = string(reencode(information, encoding))
 
@@ -269,7 +284,10 @@ func readFrame(r io.Reader) (Frame, error) {
 	if header.id[0] == 'W' && header.id != "WXXX" {
 		frame := URLLinkFrame{FrameHeader: header}
 		url := make([]byte, headerSize)
-		binary.Read(r, binary.BigEndian, url)
+		err = binary.Read(r, binary.BigEndian, url)
+		if err != nil {
+			return nil, err
+		}
 		frame.URL = string(iso88591ToUTF8(url))
 
 		return frame, nil

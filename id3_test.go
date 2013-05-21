@@ -108,6 +108,26 @@ func TestTimeParsing(t *testing.T) {
 	}
 }
 
+func TestUserFrameNameParsing(t *testing.T) {
+	tests := []struct {
+		in      FrameType
+		outName FrameType
+		outBool bool
+	}{
+		{"TLEN", "", false},
+		{"TXXX:", "", false},
+		{"TXXX:User frame", "User frame", true},
+	}
+
+	for _, test := range tests {
+		out, ok := frameNameToUserFrame(test.in)
+		if out != test.outName || ok != test.outBool {
+			t.Fatalf("Didn't parse user frame name correctly. Expected: %q/%t, got %q/%t",
+				test.outName, test.outBool, out, ok)
+		}
+	}
+}
+
 func BenchmarkISO88591ToUTF8(b *testing.B) {
 	b.SetBytes(int64(len(ISOTestString)))
 	for i := 0; i < b.N; i++ {

@@ -548,6 +548,9 @@ func (f *File) Parse() error {
 	f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
 	f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
 	if err != nil {
+		if _, ok := err.(NotATagHeader); ok {
+			return nil
+		}
 		return err
 	}
 

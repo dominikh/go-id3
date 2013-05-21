@@ -428,6 +428,7 @@ func (f *File) upgrade() {
 	for name, _ := range f.Frames {
 		switch name {
 		case "TLAN", "TCON", "TPE1", "TOPE", "TCOM", "TEXT", "TOLY":
+			Logging.Println("Replacing / with x00 for", name)
 			f.SetTextFrameSlice(name, strings.Split(f.GetTextFrame(name), "/"))
 		}
 	}

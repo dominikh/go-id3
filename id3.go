@@ -715,20 +715,7 @@ func (f *File) HasFrame(name FrameType) bool {
 func (f *File) GetTextFrame(name FrameType) string {
 	userFrameName, ok := frameNameToUserFrame(name)
 	if ok {
-		// Extract a user text frame from the TXXX slice
-		frames, ok := f.Frames["TXXX"]
-		if !ok {
-			return ""
-		}
-
-		for _, frame := range frames {
-			userFrame := frame.(UserTextInformationFrame)
-			if userFrame.Description == userFrameName {
-				return userFrame.Text
-			}
-		}
-
-		return ""
+		return f.getUserTextFrame(userFrameName)
 	}
 
 	// Get normal text frame
@@ -738,6 +725,22 @@ func (f *File) GetTextFrame(name FrameType) string {
 	}
 
 	return frames[0].(TextInformationFrame).Text
+}
+
+func (f *File) getUserTextFrame(name string) string {
+	frames, ok := f.Frames["TXXX"]
+	if !ok {
+		return ""
+	}
+
+	for _, frame := range frames {
+		userFrame := frame.(UserTextInformationFrame)
+		if userFrame.Description == name {
+			return userFrame.Text
+		}
+	}
+
+	return ""
 }
 
 func (f *File) GetTextFrameNumber(name FrameType) int {
@@ -777,33 +780,7 @@ func (f *File) GetTextFrameTime(name FrameType) time.Time {
 func (f *File) SetTextFrame(name FrameType, value string) {
 	userFrameName, ok := frameNameToUserFrame(name)
 	if ok {
-		// Set/create a user text frame
-		frame := UserTextInformationFrame{
-			FrameHeader: FrameHeader{id: "TXXX"},
-			Description: string(userFrameName),
-			Text:        value,
-		}
-
-		frames, ok := f.Frames["TXXX"]
-		if !ok {
-			frames = make([]Frame, 0)
-			f.Frames["TXXX"] = frames
-		}
-
-		var i int
-		for i = range frames {
-			if frames[i].(UserTextInformationFrame).Description == userFrameName {
-				ok = true
-				break
-			}
-		}
-
-		if ok {
-			frames[i] = frame
-		} else {
-			f.Frames["TXXX"] = append(f.Frames["TXXX"], frame)
-		}
-
+		f.setUserTextFrame(userFrameName, value)
 		return
 	}
 
@@ -819,6 +796,36 @@ func (f *File) SetTextFrame(name FrameType, value string) {
 		Text: value,
 	}
 	// TODO what about flags and preserving them?
+}
+
+func (f *File) setUserTextFrame(name string, value string) {
+	// Set/create a user text frame
+	frame := UserTextInformationFrame{
+		FrameHeader: FrameHeader{id: "TXXX"},
+		Description: name,
+		Text:        value,
+	}
+
+	frames, ok := f.Frames["TXXX"]
+	if !ok {
+		frames = make([]Frame, 0)
+		f.Frames["TXXX"] = frames
+	}
+
+	var i int
+	for i = range frames {
+		if frames[i].(UserTextInformationFrame).Description == name {
+			ok = true
+			break
+		}
+	}
+
+	if ok {
+		frames[i] = frame
+	} else {
+		f.Frames["TXXX"] = append(f.Frames["TXXX"], frame)
+	}
+
 }
 
 func (f *File) SetTextFrameNumber(name FrameType, value int) {

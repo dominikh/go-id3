@@ -689,7 +689,7 @@ func (f *File) GetTextFrameSlice(name FrameType) []string {
 		return nil
 	}
 
-	return strings.Split(s, "/")
+	return strings.Split(s, "\x00")
 }
 
 func (f *File) GetTextFrameTime(name FrameType) time.Time {
@@ -731,7 +731,7 @@ func (f *File) SetTextFrameNumber(name FrameType, value int) {
 }
 
 func (f *File) SetTextFrameSlice(name FrameType, value []string) {
-	f.SetTextFrame(name, strings.Join(value, "/"))
+	f.SetTextFrame(name, strings.Join(value, "\x00"))
 }
 
 func (f *File) SetTextFrameTime(name FrameType, value time.Time) {
@@ -960,7 +960,6 @@ func splitNullN(data []byte, encoding Encoding, n int) [][]byte {
 }
 
 func reencode(b []byte, encoding Encoding) []byte {
-	// TODO: truncate after null byte
 	// FIXME: strip trailing null byte
 	var ret []byte
 	switch encoding {

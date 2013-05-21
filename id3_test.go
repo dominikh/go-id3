@@ -111,7 +111,7 @@ func TestTimeParsing(t *testing.T) {
 func TestUserFrameNameParsing(t *testing.T) {
 	tests := []struct {
 		in      FrameType
-		outName FrameType
+		outName string
 		outBool bool
 	}{
 		{"TLEN", "", false},

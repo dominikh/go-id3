@@ -727,7 +727,7 @@ func (f *File) GetTextFrame(name FrameType) string {
 
 		for _, frame := range frames {
 			userFrame := frame.(UserTextInformationFrame)
-			if userFrame.Description == string(userFrameName) {
+			if userFrame.Description == userFrameName {
 				return userFrame.Text
 			}
 		}
@@ -778,7 +778,7 @@ func (f *File) GetTextFrameTime(name FrameType) time.Time {
 	return t
 }
 
-func frameNameToUserFrame(name FrameType) (FrameType, bool) {
+func frameNameToUserFrame(name FrameType) (string, bool) {
 	if len(name) < 6 {
 		return "", false
 	}
@@ -787,7 +787,7 @@ func frameNameToUserFrame(name FrameType) (FrameType, bool) {
 		return "", false
 	}
 
-	return name[5:], true
+	return string(name[5:]), true
 }
 
 func (f *File) SetTextFrame(name FrameType, value string) {
@@ -808,7 +808,7 @@ func (f *File) SetTextFrame(name FrameType, value string) {
 
 		var i int
 		for i = range frames {
-			if frames[i].(UserTextInformationFrame).Description == string(userFrameName) {
+			if frames[i].(UserTextInformationFrame).Description == userFrameName {
 				ok = true
 				break
 			}

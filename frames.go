@@ -183,16 +183,17 @@ func (f TextInformationFrame) size() int {
 }
 
 func (f TextInformationFrame) WriteTo(w io.Writer) (int64, error) {
-	if f.FrameHeader.ID() == "TRDA" {
-		Logging.Println("Skipping TRDA header")
+	switch f.FrameHeader.ID() {
+	case "TRDA", "TSIZ":
+		Logging.Println("Not writing header", f.FrameHeader.ID())
 		return 0, nil
+	default:
+		return writeMany(w,
+			f.FrameHeader.serialize(f.size()-frameLength),
+			utf8byte,
+			[]byte(f.Text),
+		)
 	}
-
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Text),
-	)
 }
 
 func (f UserTextInformationFrame) size() int {

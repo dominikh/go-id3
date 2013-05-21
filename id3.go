@@ -435,7 +435,6 @@ func (f *File) upgrade() {
 	// TODO IPL → TMCL, TIPL
 	// TODO RVAD → RVA2
 	// TODO TRDA → TDRL
-	// TODO TSIZ → /
 }
 
 // Clear removes all tags from the file.

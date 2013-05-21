@@ -278,10 +278,10 @@ func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
 	return 0, nil
 }
 
-func readTXXXFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, error) {
+func readTXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	var encoding Encoding
 	frame := UserTextInformationFrame{FrameHeader: header}
-	rest := make([]byte, headerSize-1)
+	rest := make([]byte, frameSize-1)
 
 	err := readBinary(r, &encoding, &rest)
 	if err != nil {
@@ -294,10 +294,10 @@ func readTXXXFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, erro
 	return frame, nil
 }
 
-func readWXXXFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, error) {
+func readWXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	var encoding Encoding
 	frame := UserDefinedURLLinkFrame{FrameHeader: header}
-	rest := make([]byte, headerSize-1)
+	rest := make([]byte, frameSize-1)
 
 	err := readBinary(r, &encoding, &rest)
 	if err != nil {
@@ -311,9 +311,9 @@ func readWXXXFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, erro
 	return frame, nil
 }
 
-func readUFIDFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, error) {
+func readUFIDFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	frame := UniqueFileIdentifierFrame{FrameHeader: header}
-	rest := make([]byte, headerSize)
+	rest := make([]byte, frameSize)
 
 	err := binary.Read(r, binary.BigEndian, &rest)
 	if err != nil {
@@ -327,14 +327,14 @@ func readUFIDFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, erro
 	return frame, nil
 }
 
-func readCOMMFrame(r io.Reader, header FrameHeader, headerSize int) (Frame, error) {
+func readCOMMFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	frame := CommentFrame{FrameHeader: header}
 	var (
 		encoding Encoding
 		language [3]byte
 		rest     []byte
 	)
-	rest = make([]byte, headerSize-4)
+	rest = make([]byte, frameSize-4)
 
 	err := readBinary(r, &encoding, &language, &rest)
 	if err != nil {

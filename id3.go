@@ -248,7 +248,7 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	header.id = FrameType(headerBytes.ID[:])
 	header.flags = FrameFlags(int16(headerBytes.Flags[0])<<8 | int16(headerBytes.Flags[1]))
-	headerSize := desynchsafeInt(headerBytes.Size)
+	frameSize := desynchsafeInt(headerBytes.Size)
 
 	if header.flags.Compressed() {
 		// TODO: Read decompressed size (4 bytes)
@@ -270,7 +270,7 @@ func readFrame(r io.Reader) (Frame, error) {
 	if header.id[0] == 'T' && header.id != "TXXX" {
 		var encoding Encoding
 		frame := TextInformationFrame{FrameHeader: header}
-		information := make([]byte, headerSize-1)
+		information := make([]byte, frameSize-1)
 		err := readBinary(r, &encoding, &information)
 		if err != nil {
 			return nil, err
@@ -283,7 +283,7 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	if header.id[0] == 'W' && header.id != "WXXX" {
 		frame := URLLinkFrame{FrameHeader: header}
-		url := make([]byte, headerSize)
+		url := make([]byte, frameSize)
 		err = binary.Read(r, binary.BigEndian, url)
 		if err != nil {
 			return nil, err
@@ -295,15 +295,15 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	switch header.id {
 	case "TXXX":
-		return readTXXXFrame(r, header, headerSize)
+		return readTXXXFrame(r, header, frameSize)
 	case "WXXX":
-		return readWXXXFrame(r, header, headerSize)
+		return readWXXXFrame(r, header, frameSize)
 	case "UFID":
-		return readUFIDFrame(r, header, headerSize)
+		return readUFIDFrame(r, header, frameSize)
 	case "COMM":
-		return readCOMMFrame(r, header, headerSize)
+		return readCOMMFrame(r, header, frameSize)
 	default:
-		_, err := r.Read(make([]byte, headerSize))
+		_, err := r.Read(make([]byte, frameSize))
 
 		return UnsupportedFrame{header}, err
 	}

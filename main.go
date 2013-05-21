@@ -20,6 +20,15 @@ var _ = spew.Dump
 
 // The amount of padding that will be added after the last frame
 var Padding = 1024
+var Logging logFlag
+
+type logFlag bool
+
+func (l logFlag) Println(args ...interface{}) {
+	if l {
+		log.Println(args...)
+	}
+}
 
 const (
 	iso88591 = 0
@@ -329,7 +338,7 @@ func (UnsupportedFrame) size() int {
 }
 
 func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
-	log.Println("Cannot serialize unsupported frame:", f)
+	Logging.Println("Cannot serialize unsupported frame:", f)
 	// TODO remove println
 	// TODO check if unsupported frame should be dropped or copied verbatim
 	return 0, nil

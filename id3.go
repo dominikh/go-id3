@@ -2,7 +2,6 @@ package id3
 
 import (
 	"bytes"
-	_ "code.google.com/p/go-charset/data"
 	"encoding/binary"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"

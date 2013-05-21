@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,8 +13,6 @@ import (
 	"time"
 	utf16pkg "unicode/utf16"
 )
-
-var _ = spew.Dump
 
 // The amount of padding that will be added after the last frame.
 var Padding = 1024

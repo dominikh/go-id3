@@ -712,27 +712,32 @@ func (f *File) HasFrame(name FrameType) bool {
 	return ok
 }
 
-// GetTextFrame returns the text frame specified by name. If it is not
-// a valid text frame name (i.e. it does not start with a T or is
-// named TXXX), GetTextFrame will panic.
+// GetTextFrame returns the text frame specified by name.
+//
+// To access user text frames, specify the name like "TXXX:The
+// description".
+//
+// If it is not a valid text frame name GetTextFrame will panic.
 func (f *File) GetTextFrame(name FrameType) string {
-	var frames []Frame
-	var ok bool
-	if name[0] != 'T' {
-		frames, ok = f.Frames["TXXX"]
-	} else {
-		frames, ok = f.Frames[name]
+	if len(name) < 4 {
+		panic("Text frame name too short: " + name)
 	}
 
-	if !ok {
-		return ""
-	}
+	// Extract a user text frame from the TXXX slice
+	if name[0:4] == "TXXX" {
+		if len(name) < 6 {
+			panic("Not a valid user text frame specifier: " + name)
+		}
 
-	if name[0] != 'T' {
-		// Treat name like it's the description of a TXXX
+		userFrameName := name[5:]
+		frames, ok := f.Frames["TXXX"]
+		if !ok {
+			return ""
+		}
+
 		for _, frame := range frames {
 			userFrame := frame.(UserTextInformationFrame)
-			if userFrame.Description == string(name) {
+			if userFrame.Description == string(userFrameName) {
 				return userFrame.Text
 			}
 		}
@@ -740,6 +745,8 @@ func (f *File) GetTextFrame(name FrameType) string {
 		return ""
 	}
 
+	// Get normal text frame
+	frames := f.Frames[name]
 	if len(frames) == 0 {
 		return ""
 	}

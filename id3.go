@@ -312,8 +312,12 @@ func (f *File) Close() error {
 	return f.f.Close()
 }
 
-// Parse parses the file's tags.
-func (f *File) Parse() error {
+// ParseHeader parses only the ID3 header of the file.
+//
+// This can be useful if you're not interested in the existing tag but
+// want to write your own. In that case, parsing the header is still
+// required to be able to overwrite the existing tag.
+func (f *File) ParseHeader() error {
 	header, n, err := readHeader(f.f)
 	f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
 	f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
@@ -325,6 +329,16 @@ func (f *File) Parse() error {
 	}
 
 	f.Header = header
+	return nil
+}
+
+// Parse parses the file's tags.
+func (f *File) Parse() error {
+	err := f.ParseHeader()
+	if err != nil {
+		return err
+	}
+
 	for {
 		frame, err := readFrame(f.tagReader)
 		if err != nil {

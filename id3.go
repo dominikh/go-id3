@@ -512,6 +512,19 @@ func (f *File) SetComposers(composers []string) {
 	f.SetTextFrameSlice("TCOM", composers)
 }
 
+func (f *File) Composer() string {
+	composers := f.Composers()
+	if len(composers) > 0 {
+		return composers[0]
+	}
+
+	return ""
+}
+
+func (f *File) SetComposer(composer string) {
+	f.SetTextFrame("TCOM", composer)
+}
+
 func (f *File) Title() string {
 	return f.GetTextFrame("TIT2")
 }

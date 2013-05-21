@@ -40,5 +40,18 @@ There are two ways to access frames: Using provided getter and setter
 methods (there is one for every standard frame), and working directly
 with the underlying frames.
 
+For frames that usually support multiple values, e.g. languages, there
+will be two different setters and getters: One that operates on slices
+and one that operates on single values. When getting a single value,
+it will return the first value from the underlying list. When setting
+a single value, it will overwrite the list with a single value.
+
+Text frames and user text frames can be manipulated with the
+GetTextFrame* and SetTextFrame* class. There are special methods for
+working with integers, slices and times. This class of functions
+expects the raw frame names (e.g. "TLEN"), with the special case of
+user text frames ("TXXX") where it expects a format of the kind
+"TXXX:The frame description" to address a specific user text frame.
+
 */
 package id3

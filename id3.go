@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	utf16p "unicode/utf16"
+	utf16pkg "unicode/utf16"
 )
 
 var _ = spew.Dump
@@ -1077,7 +1077,7 @@ func utf16ToUTF8(input []byte) []byte {
 		i++
 	}
 
-	return []byte(string(utf16p.Decode(uint16s)))
+	return []byte(string(utf16pkg.Decode(uint16s)))
 }
 
 func iso88591ToUTF8(input []byte) []byte {

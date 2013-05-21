@@ -1,4 +1,4 @@
-package main
+package id3
 
 import (
 	"bytes"
@@ -82,56 +82,6 @@ type TagHeader struct {
 	Version Version
 	Flags   HeaderFlags
 	Size    int
-}
-
-type FrameHeader struct {
-	id    FrameType
-	flags FrameFlags
-}
-
-type Frame interface {
-	ID() FrameType
-	io.WriterTo
-	size() int
-}
-
-type TextInformationFrame struct {
-	FrameHeader
-	Text string
-}
-
-type UserTextInformationFrame struct {
-	FrameHeader
-	Description string
-	Text        string
-}
-
-type UniqueFileIdentifierFrame struct {
-	FrameHeader
-	Owner      string
-	Identifier []byte
-}
-
-type URLLinkFrame struct {
-	FrameHeader
-	URL string
-}
-
-type UserDefinedURLLinkFrame struct {
-	FrameHeader
-	Description string
-	URL         string
-}
-
-type CommentFrame struct {
-	FrameHeader
-	Language    string
-	Description string
-	Text        string
-}
-
-type UnsupportedFrame struct {
-	FrameHeader
 }
 
 type File struct {
@@ -230,127 +180,6 @@ func (f FrameFlags) Grouped() bool {
 
 func (v Version) String() string {
 	return fmt.Sprintf("ID3v2.%.1d.%.1d", v>>8, v&0xFF)
-}
-
-func (f FrameHeader) ID() FrameType {
-	return f.id
-}
-
-func (f FrameHeader) serialize(size int) []byte {
-	out := make([]byte, 10)
-	copy(out, f.id)
-
-	flagBytes := intToBytes(int(f.flags))
-	copy(out[8:10], flagBytes[2:4])
-
-	sizeBytes := intToBytes(synchsafeInt(size))
-	copy(out[4:8], sizeBytes)
-
-	return out
-}
-
-func (f TextInformationFrame) size() int {
-	if f.FrameHeader.ID() == "TRDA" {
-		return 0
-	}
-
-	return frameLength + len(f.Text) + 1
-}
-
-func (f TextInformationFrame) WriteTo(w io.Writer) (int64, error) {
-	if f.FrameHeader.ID() == "TRDA" {
-		Logging.Println("Skipping TRDA header")
-		return 0, nil
-	}
-
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Text),
-	)
-}
-
-func (f UserTextInformationFrame) size() int {
-	return frameLength + len(f.Description) + len(f.Text) + 2
-}
-
-func (f UserTextInformationFrame) WriteTo(w io.Writer) (int64, error) {
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Description),
-		nul,
-		[]byte(f.Text),
-	)
-}
-
-func (f UniqueFileIdentifierFrame) size() int {
-	iso := utf8ToISO88591([]byte(f.Owner))
-	return frameLength + len(f.Identifier) + len(iso) + 1
-}
-
-func (f UniqueFileIdentifierFrame) WriteTo(w io.Writer) (int64, error) {
-	iso := utf8ToISO88591([]byte(f.Owner))
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		iso,
-		nul,
-		f.Identifier,
-	)
-}
-
-func (f URLLinkFrame) size() int {
-	return frameLength + len(utf8ToISO88591([]byte(f.URL)))
-}
-
-func (f URLLinkFrame) WriteTo(w io.Writer) (int64, error) {
-	iso := utf8ToISO88591([]byte(f.URL))
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		iso,
-	)
-}
-
-func (f UserDefinedURLLinkFrame) size() int {
-	iso := utf8ToISO88591([]byte(f.URL))
-	return frameLength + len(f.Description) + len(iso) + 2
-}
-
-func (f UserDefinedURLLinkFrame) WriteTo(w io.Writer) (int64, error) {
-	iso := utf8ToISO88591([]byte(f.URL))
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Description),
-		nul,
-		iso,
-	)
-}
-
-func (f CommentFrame) size() int {
-	return frameLength + len(f.Description) + len(f.Text) + 5
-}
-
-func (f CommentFrame) WriteTo(w io.Writer) (int64, error) {
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Language),
-		[]byte(f.Description),
-		nul,
-		[]byte(f.Text),
-	)
-}
-
-func (UnsupportedFrame) size() int {
-	return 0
-}
-
-func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
-	Logging.Println("Cannot serialize unsupported frame:", f)
-	// TODO remove println
-	// TODO check if unsupported frame should be dropped or copied verbatim
-	return 0, nil
 }
 
 // readHeader reads an ID3v2 header. It expects the reader to be
@@ -456,65 +285,6 @@ func readFrame(r io.Reader) (Frame, error) {
 	}
 }
 
-func readTXXXFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
-	var encoding Encoding
-	frame := UserTextInformationFrame{FrameHeader: header}
-	binary.Read(r, binary.BigEndian, &encoding)
-	rest := make([]byte, headerSize-1)
-	binary.Read(r, binary.BigEndian, &rest)
-	parts := splitNullN(rest, encoding, 2)
-	frame.Description = string(reencode(parts[0], encoding))
-	frame.Text = string(reencode(parts[1], encoding))
-
-	return frame
-}
-
-func readWXXXFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
-	var encoding Encoding
-	frame := UserDefinedURLLinkFrame{FrameHeader: header}
-	binary.Read(r, binary.BigEndian, &encoding)
-	rest := make([]byte, headerSize-1)
-	binary.Read(r, binary.BigEndian, &rest)
-	parts := splitNullN(rest, encoding, 2)
-	frame.Description = string(reencode(parts[0], encoding))
-	frame.URL = string(iso88591ToUTF8(parts[1]))
-
-	return frame
-}
-
-func readUFIDFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
-	frame := UniqueFileIdentifierFrame{FrameHeader: header}
-	rest := make([]byte, headerSize)
-	binary.Read(r, binary.BigEndian, &rest)
-	parts := bytes.SplitN(rest, []byte{0}, 2)
-	frame.Owner = string(reencode(parts[0], iso88591))
-	frame.Identifier = parts[1]
-
-	return frame
-}
-
-func readCOMMFrame(r io.Reader, header FrameHeader, headerSize int) Frame {
-	frame := CommentFrame{FrameHeader: header}
-	var (
-		encoding Encoding
-		language [3]byte
-		rest     []byte
-	)
-	rest = make([]byte, headerSize-4)
-
-	binary.Read(r, binary.BigEndian, &encoding)
-	binary.Read(r, binary.BigEndian, &language)
-	binary.Read(r, binary.BigEndian, &rest)
-
-	parts := splitNullN(rest, encoding, 2)
-
-	frame.Language = string(language[:])
-	frame.Description = string(reencode(parts[0], encoding))
-	frame.Text = string(reencode(parts[1], encoding))
-
-	return frame
-}
-
 func New(file *os.File) (*File, error) {
 	stat, err := file.Stat()
 	if err != nil {
@@ -567,10 +337,65 @@ func (f *File) Parse() error {
 		f.Frames[frame.ID()] = append(f.Frames[frame.ID()], frame)
 	}
 
+	if f.Header.Version < 0x0400 {
+		f.upgrade()
+	}
 	f.hasTags = true
 	return nil
 }
 
+// upgrade upgrades tags from an older version to IDv2.4. It should
+// only be called for files that use an older version.
+func (f *File) upgrade() {
+	// Upgrade TYER/TDAT/TIME to TDRC if at least
+	// one of TYER, TDAT or TIME are set.
+	if f.HasFrame("TYER") || f.HasFrame("TDAT") || f.HasFrame("TIME") {
+		Logging.Println("Replacing TYER, TDAT and TIME with TDRC...")
+
+		year := f.GetTextFrameNumber("TYER")
+		date := f.GetTextFrame("TDAT")
+		t := f.GetTextFrame("TIME")
+
+		if len(date) != 4 {
+			date = "0101"
+		}
+
+		if len(t) != 4 {
+			t = "0000"
+		}
+
+		day, _ := strconv.Atoi(date[0:2])
+		month, _ := strconv.Atoi(date[2:])
+		hour, _ := strconv.Atoi(date[0:2])
+		minute, _ := strconv.Atoi(date[2:])
+
+		f.SetRecordingTime(time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.UTC))
+		f.RemoveFrames("TYER")
+		f.RemoveFrames("TDAT")
+		f.RemoveFrames("TIME")
+	}
+
+	// Upgrade Original Release Year to Original Release Time
+	if !f.HasFrame("TDOR") {
+		if f.HasFrame("TORY") {
+			Logging.Println("Replacing TORY with TDOR")
+
+			year := f.GetTextFrameNumber("TORY")
+			f.SetOriginalReleaseTime(time.Date(year, 0, 0, 0, 0, 0, 0, time.UTC))
+		} else if f.HasFrame("XDOR") {
+			Logging.Println("Replacing XDOR with TDOR")
+			panic("not implemented") // FIXME
+		}
+	}
+
+	for name, _ := range f.Frames {
+		switch name {
+		case "TLAN", "TCON", "TPE1", "TOPE", "TCOM", "TEXT", "TOLY":
+			f.SetTextFrameSlice(name, strings.Split(f.GetTextFrame(name), "/"))
+		}
+	}
+	// TODO slash -> \x00 as value separator
+}
 
 // Clear removes all tags from the file.
 func (f *File) Clear() {
@@ -583,6 +408,12 @@ func (f *File) RemoveFrames(name FrameType) {
 
 func (f *File) Validate() error {
 	panic("not implemented")
+
+	if f.HasFrame("TSRC") && len(f.GetTextFrame("TSRC")) != 12 {
+		// TODO invalid TSRC frame
+	}
+
+	return nil
 }
 
 func (f *File) Album() string {
@@ -593,12 +424,62 @@ func (f *File) SetAlbum(album string) {
 	f.SetTextFrame("TALB", album)
 }
 
+func (f *File) Artists() []string {
+	return f.GetTextFrameSlice("TPE1")
+}
+
+func (f *File) SetArtists(artists []string) {
+	f.SetTextFrameSlice("TPE1", artists)
+}
+
 func (f *File) Artist() string {
-	return f.GetTextFrame("TPE1") // FIXME <IDv2.4
+	artists := f.Artists()
+	if len(artists) > 0 {
+		return artists[0]
+	}
+
+	return ""
 }
 
 func (f *File) SetArtist(artist string) {
 	f.SetTextFrame("TPE1", artist)
+}
+
+func (f *File) Band() string {
+	return f.GetTextFrame("TPE2")
+}
+
+func (f *File) SetBand(band string) {
+	f.SetTextFrame("TPE2", band)
+}
+
+func (f *File) Conductor() string {
+	return f.GetTextFrame("TPE3")
+}
+
+func (f *File) SetConductor(name string) {
+	f.SetTextFrame("TPE3", name)
+}
+
+func (f *File) OriginalArtists() []string {
+	return f.GetTextFrameSlice("TOPE")
+}
+
+func (f *File) SetOriginalArtists(names []string) {
+	f.SetTextFrameSlice("TOPE", names)
+}
+
+func (f *File) OriginalArtist() string {
+	artists := f.OriginalArtists()
+	if len(artists) > 0 {
+		return artists[0]
+	}
+
+	return ""
+}
+
+func (f *File) SetOriginalArtist(name string) {
+	f.SetTextFrame("TOPE", name)
 }
 
 func (f *File) BPM() int {
@@ -625,6 +506,10 @@ func (f *File) Length() time.Duration {
 	// TODO if TLEN frame doesn't exist determine the length by
 	// parsing the underlying audio file
 	return time.Duration(f.GetTextFrameNumber("TLEN")) * time.Millisecond
+}
+
+func (f *File) SetLength(d time.Duration) {
+	f.SetTextFrameNumber("TLEN", int(d.Nanoseconds()/1e6))
 }
 
 func (f *File) Languages() []string {
@@ -656,8 +541,28 @@ func (f *File) SetPublisher(publisher string) {
 	f.SetTextFrame("TPUB", publisher)
 }
 
+func (f *File) StationName() string {
+	return f.GetTextFrame("TRSN")
+}
+
+func (f *File) SetStationName(name string) {
+	f.SetTextFrame("TRSN", name)
+}
+
+func (f *File) StationOwner() string {
+	return f.GetTextFrame("TRSO")
+}
+
+func (f *File) SetStationOwner(owner string) {
+	f.SetTextFrame("TRSO", owner)
+}
+
 func (f *File) Owner() string {
 	return f.GetTextFrame("TOWN")
+}
+
+func (f *File) SetOwner(owner string) {
+	f.SetTextFrame("TOWN", owner)
 }
 
 func (f *File) RecordingTime() time.Time {
@@ -674,6 +579,70 @@ func (f *File) OriginalReleaseTime() time.Time {
 
 func (f *File) SetOriginalReleaseTime(t time.Time) {
 	f.SetTextFrameTime("TDOR", t)
+}
+
+func (f *File) OriginalFilename() string {
+	return f.GetTextFrame("TOFN")
+}
+
+func (f *File) SetOriginalFilename(name string) {
+	f.SetTextFrame("TOFN", name)
+}
+
+func (f *File) PlaylistDelay() time.Duration {
+	return time.Duration(f.GetTextFrameNumber("TDLY")) * time.Millisecond
+}
+
+func (f *File) SetPlaylistDelay(d time.Duration) {
+	f.SetTextFrameNumber("TDLY", int(d.Nanoseconds()/1e6))
+}
+
+func (f *File) EncodingTime() time.Time {
+	return f.GetTextFrameTime("TDEN")
+}
+
+func (f *File) SetEncodingTime(t time.Time) {
+	f.SetTextFrameTime("TDEN", t)
+}
+
+func (f *File) AlbumSortOrder() string {
+	return f.GetTextFrame("TSOA")
+}
+
+func (f *File) SetAlbumSortOrder(s string) {
+	f.SetTextFrame("TSOA", s)
+}
+
+func (f *File) PerformerSortOrder() string {
+	return f.GetTextFrame("TSOP")
+}
+
+func (f *File) SetPerformerSortOrder(s string) {
+	f.SetTextFrame("TSOP", s)
+}
+
+func (f *File) TitleSortOrder() string {
+	return f.GetTextFrame("TSOT")
+}
+
+func (f *File) SetTitleSortOrder(s string) {
+	f.SetTextFrame("TSOT", s)
+}
+
+func (f *File) ISRC() string {
+	return f.GetTextFrame("TSRC")
+}
+
+func (f *File) SetISRC(isrc string) {
+	f.SetTextFrame("TSRC", isrc)
+}
+
+func (f *File) Mood() string {
+	return f.GetTextFrame("TMOO")
+}
+
+func (f *File) SetMood(mood string) {
+	f.SetTextFrame("TMOO", mood)
 }
 
 func (f *File) HasFrame(name FrameType) bool {
@@ -1104,39 +1073,7 @@ func parseTime(input string) (res time.Time, err error) {
 	return
 }
 
-func main() {
-	file := "test.mp3"
-	if len(os.Args) > 1 {
-		file = os.Args[1]
-	}
+// TRCK
+// The 'Track number/Position in set' frame is a numeric string containing the order number of the audio-file on its original recording. This may be extended with a "/" character and a numeric string containing the total numer of tracks/elements on the original recording. E.g. "4/9".
 
-	f, err := os.OpenFile(file, os.O_RDWR, 0)
-	if err != nil {
-		panic(err)
-	}
-
-	tags, err := New(f)
-	if err != nil {
-		panic(err)
-	}
-	err = tags.Parse()
-	if _, ok := err.(NotATagHeader); err != nil && !ok {
-		panic(err)
-	}
-
-	// tags.SetTitle("A completely new title!")
-
-	tags.SetTitle("This is a really long title with a moderate amount of unicode: äöü – And now even more! Yay. Mhm.")
-	// fmt.Println(tags.Title())
-	fmt.Println(tags.Save())
-
-	// tags.SetTitle("a")
-	// tags.Save()
-
-	// tags.SetTitle("ab")
-	// tags.Save()
-
-	// tags.SetTitle("abc")
-	// tags.Save()
-
-}
+// TODO update TDTG when writing tags

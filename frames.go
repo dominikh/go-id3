@@ -1,4 +1,4 @@
-package main
+package id3
 
 import (
 	"bytes"

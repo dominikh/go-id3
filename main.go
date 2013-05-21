@@ -624,6 +624,27 @@ func (f *File) Length() time.Duration {
 	return time.Duration(f.GetTextFrameNumber("TLEN")) * time.Millisecond
 }
 
+func (f *File) Languages() []string {
+	return f.GetTextFrameSlice("TLAN")
+}
+
+func (f *File) Language() string {
+	langs := f.Languages()
+	if len(langs) == 0 {
+		return ""
+	}
+
+	return langs[0]
+}
+
+func (f *File) SetLanguages(langs []string) {
+	f.SetTextFrameSlice("TLAN", langs)
+}
+
+func (f *File) SetLanguage(lang string) {
+	f.SetTextFrame("TLAN", lang)
+}
+
 func (f *File) Publisher() string {
 	return f.GetTextFrame("TPUB")
 }

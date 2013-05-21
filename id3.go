@@ -791,8 +791,36 @@ func frameNameToUserFrame(name FrameType) (FrameType, bool) {
 }
 
 func (f *File) SetTextFrame(name FrameType, value string) {
-	if name[0] != 'T' || name == "TXXX" {
-		panic("not a valid text frame name: " + name)
+	userFrameName, ok := frameNameToUserFrame(name)
+	if ok {
+		// Set/create a user text frame
+		frame := UserTextInformationFrame{
+			FrameHeader: FrameHeader{id: "TXXX"},
+			Description: string(userFrameName),
+			Text:        value,
+		}
+
+		frames, ok := f.Frames["TXXX"]
+		if !ok {
+			frames = make([]Frame, 0)
+			f.Frames["TXXX"] = frames
+		}
+
+		var i int
+		for i = range frames {
+			if frames[i].(UserTextInformationFrame).Description == string(userFrameName) {
+				ok = true
+				break
+			}
+		}
+
+		if ok {
+			frames[i] = frame
+		} else {
+			f.Frames["TXXX"] = append(f.Frames["TXXX"], frame)
+		}
+
+		return
 	}
 
 	frames, ok := f.Frames[name]

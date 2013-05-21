@@ -706,6 +706,10 @@ func (f *File) GetTextFrame(name FrameType) string {
 		return ""
 	}
 
+	if len(frames) == 0 {
+		return ""
+	}
+
 	return frames[0].(TextInformationFrame).Text
 }
 

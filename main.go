@@ -661,16 +661,31 @@ func (f *File) HasFrame(name FrameType) bool {
 // a valid text frame name (i.e. it does not start with a T or is
 // named TXXX), GetTextFrame will panic.
 func (f *File) GetTextFrame(name FrameType) string {
-	if name[0] != 'T' || name == "TXXX" {
-		panic("not a valid text frame name: " + name)
+	var frames []Frame
+	var ok bool
+	if name[0] != 'T' {
+		frames, ok = f.Frames["TXXX"]
+	} else {
+		frames, ok = f.Frames[name]
 	}
 
-	frame, ok := f.Frames[name]
 	if !ok {
 		return ""
 	}
 
-	return frame[0].(TextInformationFrame).Text
+	if name[0] != 'T' {
+		// Treat name like it's the description of a TXXX
+		for _, frame := range frames {
+			userFrame := frame.(UserTextInformationFrame)
+			if userFrame.Description == string(name) {
+				return userFrame.Text
+			}
+		}
+
+		return ""
+	}
+
+	return frames[0].(TextInformationFrame).Text
 }
 
 func (f *File) GetTextFrameNumber(name FrameType) int {

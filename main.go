@@ -773,7 +773,7 @@ func (f *File) Save() error {
 		_, err = f.f.Write(make([]byte, f.Header.Size-framesSize))
 		return err
 	} else {
-		log.Println("Writing new file")
+		Logging.Println("Writing new file")
 		// We have to create a new file
 
 		var buf io.ReadWriter
@@ -781,10 +781,10 @@ func (f *File) Save() error {
 		// Work in memory If the old file was smaller than 10MiB, use
 		// a temporary file otherwise.
 		if f.fileSize < 10*1024*1024 {
-			log.Println("Working in memory")
+			Logging.Println("Working in memory")
 			buf = new(bytes.Buffer)
 		} else {
-			log.Println("Using a temporary file")
+			Logging.Println("Using a temporary file")
 			newFile, err := ioutil.TempFile("", "id3")
 			if err != nil {
 				return err

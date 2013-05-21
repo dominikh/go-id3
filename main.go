@@ -635,6 +635,14 @@ func (f *File) SetRecordingTime(t time.Time) {
 	f.SetTextFrameTime("TDRC", t)
 }
 
+func (f *File) OriginalReleaseTime() time.Time {
+	return f.GetTextFrameTime("TDOR")
+}
+
+func (f *File) SetOriginalReleaseTime(t time.Time) {
+	f.SetTextFrameTime("TDOR", t)
+}
+
 func (f *File) HasFrame(name FrameType) bool {
 	_, ok := f.Frames[name]
 	return ok

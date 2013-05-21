@@ -20,7 +20,7 @@ automatically converted to v2.4.
 One consequence of this is that when you read a file with v2.3 tags
 and immediately save it, it will now be a file with valid v2.4 tags.
 
-The upgrade process makes following changes to the tags:
+The upgrade process makes the following changes to the tags:
 
   - TYER, TDAT and TIME get replaced by TDRC
   - TORY gets replaced by TDOR
@@ -30,8 +30,8 @@ The upgrade process makes following changes to the tags:
 One special case is the TRDA frame because there is no way to
 automatically convert it to v2.4. The upgrade process will not
 directly delete the frame, so that you can manually upgrade it if
-desired, but it won't be written back to the file. In reality, the frame
-should be both rarely used and insignifcant enough to be a big loss.
+desired, but it won't be written back to the file. The frame is rarely
+used and insignificant, so it's not a big loss.
 
 
 Accessing and manipulating frames

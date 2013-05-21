@@ -308,6 +308,8 @@ func Open(name string) (*File, error) {
 	return file, err
 }
 
+// Close closes the underlying os.File. You cannot use Save or Parse
+// afterwards.
 func (f *File) Close() error {
 	return f.f.Close()
 }

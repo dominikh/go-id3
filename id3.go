@@ -448,7 +448,7 @@ func (f *File) RemoveFrames(name FrameType) {
 }
 
 func (f *File) Validate() error {
-	panic("not implemented")
+	panic("not implemented") // FIXME
 
 	if f.HasFrame("TSRC") && len(f.GetTextFrame("TSRC")) != 12 {
 		// TODO invalid TSRC frame

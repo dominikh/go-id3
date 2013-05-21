@@ -778,18 +778,6 @@ func (f *File) GetTextFrameTime(name FrameType) time.Time {
 	return t
 }
 
-func frameNameToUserFrame(name FrameType) (string, bool) {
-	if len(name) < 6 {
-		return "", false
-	}
-
-	if name[0:4] != "TXXX" {
-		return "", false
-	}
-
-	return string(name[5:]), true
-}
-
 func (f *File) SetTextFrame(name FrameType, value string) {
 	userFrameName, ok := frameNameToUserFrame(name)
 	if ok {
@@ -947,30 +935,6 @@ func (f *File) Save() error {
 		f.Header.Version = 0x0400
 		return nil
 	}
-}
-
-func truncate(f *os.File) error {
-	err := f.Truncate(0)
-	if err != nil {
-		return err
-	}
-	_, err = f.Seek(0, 0)
-	return err
-}
-
-func generateHeader(size int) []byte {
-	buf := new(bytes.Buffer)
-
-	size = synchsafeInt(size)
-
-	writeMany(buf,
-		id3byte,
-		versionByte,
-		nul, // TODO flags
-		intToBytes(size),
-	)
-
-	return buf.Bytes()
 }
 
 func (fm FramesMap) size() int {
@@ -1172,6 +1136,42 @@ func parseTime(input string) (res time.Time, err error) {
 	}
 
 	return
+}
+
+func truncate(f *os.File) error {
+	err := f.Truncate(0)
+	if err != nil {
+		return err
+	}
+	_, err = f.Seek(0, 0)
+	return err
+}
+
+func generateHeader(size int) []byte {
+	buf := new(bytes.Buffer)
+
+	size = synchsafeInt(size)
+
+	writeMany(buf,
+		id3byte,
+		versionByte,
+		nul, // TODO flags
+		intToBytes(size),
+	)
+
+	return buf.Bytes()
+}
+
+func frameNameToUserFrame(name FrameType) (string, bool) {
+	if len(name) < 6 {
+		return "", false
+	}
+
+	if name[0:4] != "TXXX" {
+		return "", false
+	}
+
+	return string(name[5:]), true
 }
 
 // TRCK

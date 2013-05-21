@@ -18,8 +18,10 @@ import (
 
 var _ = spew.Dump
 
-// The amount of padding that will be added after the last frame
+// The amount of padding that will be added after the last frame.
 var Padding = 1024
+
+// Enables logging if set to true.
 var Logging logFlag
 
 type logFlag bool
@@ -213,6 +215,10 @@ func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 	return header, 10, nil
 }
 
+// readFrame reads the next ID3 frame. It expects the reader to be
+// seeked to right before the frame. It also expects that the reader
+// can't read beyond the last frame. readFrame will return io.EOF if
+// there are no more frames to read.
 func readFrame(r io.Reader) (Frame, error) {
 	var (
 		headerBytes struct {

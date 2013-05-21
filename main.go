@@ -746,8 +746,11 @@ func (f *File) CustomFrames() []UserTextInformationFrame {
 func (f *File) Save() error {
 	framesSize := f.Frames.size()
 
-	if f.hasTags && f.Header.Size >= framesSize {
-		log.Println("Writing in-place")
+	if f.hasTags && f.Header.Size >= framesSize && len(f.Frames) > 0 {
+		// TODO consider writing headers/frames into buffer first, to
+		// not break existing file in case of error
+
+		Logging.Println("Writing in-place")
 
 		// The file already has tags and there's enough room to write
 		// ours.

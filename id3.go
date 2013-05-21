@@ -70,7 +70,7 @@ type Encoding byte
 type FrameType string
 type FramesMap map[FrameType][]Frame
 
-type NotATagHeader struct {
+type notATagHeader struct {
 	Magic [3]byte
 }
 
@@ -130,7 +130,7 @@ func (e Encoding) terminator() []byte {
 // TODO: HeaderFlags.String()
 // TODO: FrameFlags.String()
 
-func (err NotATagHeader) Error() string {
+func (err notATagHeader) Error() string {
 	return fmt.Sprintf("Not an ID3v2 header: %v", err.Magic)
 }
 
@@ -196,7 +196,7 @@ func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 
 	binary.Read(r, binary.BigEndian, &bytes.Magic)
 	if bytes.Magic != [3]byte{0x49, 0x44, 0x33} {
-		return TagHeader{}, 3, NotATagHeader{bytes.Magic}
+		return TagHeader{}, 3, notATagHeader{bytes.Magic}
 	}
 	binary.Read(r, binary.BigEndian, &bytes.Version)
 	version := Version(int16(bytes.Version[0])<<8 | int16(bytes.Version[1]))
@@ -324,7 +324,7 @@ func (f *File) ParseHeader() error {
 	f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
 	f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
 	if err != nil {
-		if _, ok := err.(NotATagHeader); ok {
+		if _, ok := err.(notATagHeader); ok {
 			return nil
 		}
 		return err

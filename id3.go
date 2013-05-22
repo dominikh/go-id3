@@ -1100,7 +1100,7 @@ func writeMany(w io.Writer, data ...[]byte) (int64, error) {
 }
 
 func desynchsafeInt(b [4]byte) int {
-	return int(b[0]<<23) | int(b[1]<<15) | int(b[2])<<7 | int(b[3])
+	return int(b[0])<<23 | int(b[1])<<15 | int(b[2])<<7 | int(b[3])
 }
 
 func synchsafeInt(i int) int {

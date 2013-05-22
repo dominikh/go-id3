@@ -77,9 +77,9 @@ type UnsupportedVersion struct {
 }
 
 type TagHeader struct {
-	Version Version
+	Version Version // The ID3v2 version the file currently has on disk
 	Flags   HeaderFlags
-	Size    int
+	Size    int // The size of the tag (exluding the size of the header)
 }
 
 type File struct {
@@ -87,7 +87,7 @@ type File struct {
 	fileSize    int64
 	tagReader   io.ReadSeeker
 	audioReader io.ReadSeeker
-	HasTags     bool // true if the actual file has tags.
+	HasTags     bool // true if the actual file has tags
 	Header      TagHeader
 	Frames      FramesMap
 }
@@ -305,6 +305,12 @@ func readFrame(r io.Reader) (Frame, error) {
 	}
 }
 
+// New creates a new file from an existing *os.File. If you plan to save
+// tags the file needs to be openes read and write, otherwise read
+// suffices.
+//
+// You need to call either Parse or ParseHeader before working
+// with the returned file.
 func New(file *os.File) (*File, error) {
 	stat, err := file.Stat()
 	if err != nil {
@@ -318,6 +324,12 @@ func New(file *os.File) (*File, error) {
 	}, nil
 }
 
+// Open opens the file in read and write mode.
+//
+// Call Close() to close the underlying *os.File when done.
+//
+// You need to call either Parse or ParseHeader before working with
+// the returned file.
 func Open(name string) (*File, error) {
 	f, err := os.OpenFile(name, os.O_RDWR, 0)
 	if err != nil {
@@ -1209,5 +1221,3 @@ func frameNameToUserFrame(name FrameType) (string, bool) {
 
 // TRCK
 // The 'Track number/Position in set' frame is a numeric string containing the order number of the audio-file on its original recording. This may be extended with a "/" character and a numeric string containing the total numer of tracks/elements on the original recording. E.g. "4/9".
-
-// TODO update TDTG when writing tags

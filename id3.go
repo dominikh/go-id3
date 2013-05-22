@@ -724,7 +724,7 @@ func (f *File) GetTextFrame(name FrameType) string {
 		return ""
 	}
 
-	return frames[0].(TextInformationFrame).Text
+	return frames[0].Value()
 }
 
 func (f *File) getUserTextFrame(name string) string {

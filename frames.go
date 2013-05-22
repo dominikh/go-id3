@@ -114,6 +114,7 @@ type FrameHeader struct {
 
 type Frame interface {
 	ID() FrameType
+	Value() string
 	io.WriterTo
 	size() int
 }
@@ -196,6 +197,10 @@ func (f TextInformationFrame) WriteTo(w io.Writer) (int64, error) {
 	}
 }
 
+func (f TextInformationFrame) Value() string {
+	return f.Text
+}
+
 func (f UserTextInformationFrame) size() int {
 	return frameLength + len(f.Description) + len(f.Text) + 2
 }
@@ -208,6 +213,10 @@ func (f UserTextInformationFrame) WriteTo(w io.Writer) (int64, error) {
 		nul,
 		[]byte(f.Text),
 	)
+}
+
+func (f UserTextInformationFrame) Value() string {
+	return f.Text
 }
 
 func (f UniqueFileIdentifierFrame) size() int {
@@ -225,6 +234,10 @@ func (f UniqueFileIdentifierFrame) WriteTo(w io.Writer) (int64, error) {
 	)
 }
 
+func (f UniqueFileIdentifierFrame) Value() string {
+	return string(f.Identifier)
+}
+
 func (f URLLinkFrame) size() int {
 	return frameLength + len(utf8ToISO88591([]byte(f.URL)))
 }
@@ -235,6 +248,10 @@ func (f URLLinkFrame) WriteTo(w io.Writer) (int64, error) {
 		f.FrameHeader.serialize(f.size()-frameLength),
 		iso,
 	)
+}
+
+func (f URLLinkFrame) Value() string {
+	return f.URL
 }
 
 func (f UserDefinedURLLinkFrame) size() int {
@@ -253,6 +270,10 @@ func (f UserDefinedURLLinkFrame) WriteTo(w io.Writer) (int64, error) {
 	)
 }
 
+func (f UserDefinedURLLinkFrame) Value() string {
+	return f.URL
+}
+
 func (f CommentFrame) size() int {
 	return frameLength + len(f.Description) + len(f.Text) + 5
 }
@@ -268,6 +289,10 @@ func (f CommentFrame) WriteTo(w io.Writer) (int64, error) {
 	)
 }
 
+func (f CommentFrame) Value() string {
+	return f.Text
+}
+
 func (UnsupportedFrame) size() int {
 	return 0
 }
@@ -277,6 +302,11 @@ func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
 	// TODO remove println
 	// TODO check if unsupported frame should be dropped or copied verbatim
 	return 0, nil
+}
+
+func (UnsupportedFrame) Value() string {
+	// TODO return raw data
+	return ""
 }
 
 func readTXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {

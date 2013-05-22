@@ -447,7 +447,26 @@ func (f *File) RemoveFrames(name FrameType) {
 	delete(f.Frames, name)
 }
 
+// Validate checks whether the tags are conforming to the
+// specification.
+//
+// This entails two checks: Whether only frames that are covered by
+// the specification are present and whether all values are within
+// valid ranges.
+//
+// It is well possible that reading existing files will result in
+// invalid tags.
+//
+// Calling Save() will not automatically validate the tags and will
+// happily write invalid tags.
+//
+// Assuming that the original file was valid and that only the
+// getter/setter methods were used the generated tags should always be
+// valid.
 func (f *File) Validate() error {
+	// TODO consider returning a list of errors, one per invalid frame,
+	// specifying the reason
+
 	panic("not implemented") // FIXME
 
 	if f.HasFrame("TSRC") && len(f.GetTextFrame("TSRC")) != 12 {
@@ -842,6 +861,7 @@ func (f *File) SetTextFrameTime(name FrameType, value time.Time) {
 
 // TODO all the other methods
 
+// UserTextFrames returns all TXXX frames.
 func (f *File) UserTextFrames() []UserTextInformationFrame {
 	res := make([]UserTextInformationFrame, len(f.Frames["TXXX"]))
 	for i, frame := range f.Frames["TXXX"] {

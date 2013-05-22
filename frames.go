@@ -154,6 +154,12 @@ type CommentFrame struct {
 	Text        string
 }
 
+type PrivateFrame struct {
+	FrameHeader
+	Owner []byte
+	Data  []byte
+}
+
 type UnsupportedFrame struct {
 	FrameHeader
 	Data []byte
@@ -294,6 +300,22 @@ func (f CommentFrame) Value() string {
 	return f.Text
 }
 
+func (f PrivateFrame) Value() string {
+	return string(f.Data)
+}
+
+func (f PrivateFrame) size() int {
+	return frameLength + len(f.Owner) + len(f.Data) + len(nul)
+}
+
+func (f PrivateFrame) WriteTo(w io.Writer) (n int64, err error) {
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		f.Owner,
+		nul,
+		f.Data,
+	)
+}
 
 func (f UnsupportedFrame) size() int {
 	return frameLength + len(f.Data)
@@ -380,6 +402,21 @@ func readCOMMFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	frame.Language = string(language[:])
 	frame.Description = string(reencode(parts[0], encoding))
 	frame.Text = string(reencode(parts[1], encoding))
+
+	return frame, nil
+}
+
+func readPRIVFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+	frame := PrivateFrame{FrameHeader: header}
+	data := make([]byte, frameSize)
+	_, err := r.Read(data)
+	if err != nil {
+		return frame, err
+	}
+
+	parts := bytes.SplitN(data, nul, 2)
+	frame.Owner = parts[0]
+	frame.Data = parts[1]
 
 	return frame, nil
 }

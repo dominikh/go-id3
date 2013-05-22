@@ -304,6 +304,8 @@ func readFrame(r io.Reader) (Frame, error) {
 		return readUFIDFrame(r, header, frameSize)
 	case "COMM":
 		return readCOMMFrame(r, header, frameSize)
+	case "PRIV":
+		return readPRIVFrame(r, header, frameSize)
 	default:
 		data := make([]byte, frameSize)
 		n, err := r.Read(data)

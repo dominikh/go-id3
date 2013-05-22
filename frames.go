@@ -156,6 +156,7 @@ type CommentFrame struct {
 
 type UnsupportedFrame struct {
 	FrameHeader
+	Data []byte
 }
 
 func (f FrameHeader) ID() FrameType {
@@ -293,15 +294,17 @@ func (f CommentFrame) Value() string {
 	return f.Text
 }
 
-func (UnsupportedFrame) size() int {
-	return 0
+
+func (f UnsupportedFrame) size() int {
+	return frameLength + len(f.Data)
 }
 
 func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
-	Logging.Println("Cannot serialize unsupported frame:", f)
-	// TODO remove println
-	// TODO check if unsupported frame should be dropped or copied verbatim
-	return 0, nil
+	// TODO check header if unsupported frame should be dropped or copied verbatim
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		f.Data,
+	)
 }
 
 func (UnsupportedFrame) Value() string {

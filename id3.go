@@ -305,9 +305,13 @@ func readFrame(r io.Reader) (Frame, error) {
 	case "COMM":
 		return readCOMMFrame(r, header, frameSize)
 	default:
-		_, err := r.Read(make([]byte, frameSize))
+		data := make([]byte, frameSize)
+		n, err := r.Read(data)
 
-		return UnsupportedFrame{header}, err
+		return UnsupportedFrame{
+			FrameHeader: header,
+			Data:        data[:n],
+		}, err
 	}
 }
 

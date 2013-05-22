@@ -18,11 +18,11 @@ import (
 var Padding = 1024
 
 // Enables logging if set to true.
-var Logging logFlag
+var Logging LogFlag
 
-type logFlag bool
+type LogFlag bool
 
-func (l logFlag) Println(args ...interface{}) {
+func (l LogFlag) Println(args ...interface{}) {
 	if l {
 		log.Println(args...)
 	}

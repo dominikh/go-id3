@@ -842,7 +842,7 @@ func (f *File) SetTextFrameTime(name FrameType, value time.Time) {
 
 // TODO all the other methods
 
-func (f *File) CustomFrames() []UserTextInformationFrame {
+func (f *File) UserTextFrames() []UserTextInformationFrame {
 	res := make([]UserTextInformationFrame, len(f.Frames["TXXX"]))
 	for i, frame := range f.Frames["TXXX"] {
 		res[i] = frame.(UserTextInformationFrame)

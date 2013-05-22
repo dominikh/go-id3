@@ -851,6 +851,80 @@ func (f *File) CustomFrames() []UserTextInformationFrame {
 	return res
 }
 
+func (f *File) saveInplace(framesSize int) error {
+	// TODO consider writing headers/frames into buffer first, to
+	// not break existing file in case of error
+	header := generateHeader(f.Header.Size)
+
+	_, err := f.f.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.f.Write(header)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Frames.WriteTo(f.f)
+	if err != nil {
+		return err
+	}
+
+	f.Header.Version = 0x0400
+	// Blank out remainder of previous tags
+	_, err = f.f.Write(make([]byte, f.Header.Size-framesSize))
+	return err
+}
+
+func (f *File) saveNew(framesSize int) error {
+	var buf io.ReadWriter
+
+	// Work in memory If the old file was smaller than 10MiB, use
+	// a temporary file otherwise.
+	if f.fileSize < 10*1024*1024 {
+		Logging.Println("Working in memory")
+		buf = new(bytes.Buffer)
+	} else {
+		Logging.Println("Using a temporary file")
+		newFile, err := ioutil.TempFile("", "id3")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(newFile.Name())
+		buf = newFile
+	}
+
+	_, err := f.WriteTo(buf)
+	if err != nil {
+		return err
+	}
+
+	// We successfully generated a new file, so replace the old
+	// one with it.
+	err = truncate(f.f)
+	if err != nil {
+		return err
+	}
+
+	if newFile, ok := buf.(*os.File); ok {
+		_, err = newFile.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = io.Copy(f.f, buf)
+	if err != nil {
+		return err
+	}
+
+	f.hasTags = true
+	f.Header.Size = framesSize + Padding
+	f.Header.Version = 0x0400
+	return nil
+}
+
 // Save saves the tags to the file. If the changed tags fit into the
 // existing file, they will be overwritten in place. Otherwise a new
 // file will be created and moved over the old file.
@@ -859,84 +933,14 @@ func (f *File) Save() error {
 	framesSize := f.Frames.size()
 
 	if f.hasTags && f.Header.Size >= framesSize && len(f.Frames) > 0 {
-		// TODO consider writing headers/frames into buffer first, to
-		// not break existing file in case of error
-
-		Logging.Println("Writing in-place")
-
 		// The file already has tags and there's enough room to write
 		// ours.
-
-		header := generateHeader(f.Header.Size)
-
-		_, err := f.f.Seek(0, 0)
-		if err != nil {
-			return err
-		}
-
-		_, err = f.f.Write(header)
-		if err != nil {
-			return err
-		}
-
-		_, err = f.Frames.WriteTo(f.f)
-		if err != nil {
-			return err
-		}
-
-		f.Header.Version = 0x0400
-		// Blank out remainder of previous tags
-		_, err = f.f.Write(make([]byte, f.Header.Size-framesSize))
-		return err
+		Logging.Println("Writing in-place")
+		return f.saveInplace(framesSize)
 	} else {
-		Logging.Println("Writing new file")
 		// We have to create a new file
-
-		var buf io.ReadWriter
-
-		// Work in memory If the old file was smaller than 10MiB, use
-		// a temporary file otherwise.
-		if f.fileSize < 10*1024*1024 {
-			Logging.Println("Working in memory")
-			buf = new(bytes.Buffer)
-		} else {
-			Logging.Println("Using a temporary file")
-			newFile, err := ioutil.TempFile("", "id3")
-			if err != nil {
-				return err
-			}
-			defer os.Remove(newFile.Name())
-			buf = newFile
-		}
-
-		_, err := f.WriteTo(buf)
-		if err != nil {
-			return err
-		}
-
-		// We successfully generated a new file, so replace the old
-		// one with it.
-		err = truncate(f.f)
-		if err != nil {
-			return err
-		}
-
-		if newFile, ok := buf.(*os.File); ok {
-			_, err = newFile.Seek(0, 0)
-			if err != nil {
-				return err
-			}
-		}
-
-		_, err = io.Copy(f.f, buf)
-		if err != nil {
-			return err
-		}
-
-		f.hasTags = true
-		f.Header.Size = framesSize + Padding
-		f.Header.Version = 0x0400
-		return nil
+		Logging.Println("Writing new file")
+		return f.saveNew(framesSize)
 	}
 }
 

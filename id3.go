@@ -92,6 +92,12 @@ type File struct {
 	Frames      FramesMap
 }
 
+type Comment struct {
+	Language    string
+	Description string
+	Text        string
+}
+
 func (f FrameType) String() string {
 	v, ok := FrameNames[f]
 	if ok {
@@ -738,6 +744,37 @@ func (f *File) Mood() string {
 
 func (f *File) SetMood(mood string) {
 	f.SetTextFrame("TMOO", mood)
+}
+
+func (f *File) Comments() []Comment {
+	frames := f.Frames["COMM"]
+	comments := make([]Comment, len(frames))
+
+	for i, frame := range frames {
+		comment := frame.(CommentFrame)
+		comments[i] = Comment{
+			Language:    comment.Language,
+			Description: comment.Description,
+			Text:        comment.Text,
+		}
+	}
+
+	return comments
+}
+
+func (f *File) SetComments(comments []Comment) {
+	frames := make([]Frame, len(comments))
+	for i, comment := range comments {
+		frames[i] = CommentFrame{
+			FrameHeader: FrameHeader{
+				id: "COMM",
+			},
+			Language:    comment.Language,
+			Description: comment.Description,
+			Text:        comment.Text,
+		}
+	}
+	f.Frames["COMM"] = frames
 }
 
 func (f *File) HasFrame(name FrameType) bool {

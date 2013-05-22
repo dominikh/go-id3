@@ -346,7 +346,7 @@ func readUFIDFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	frame := UniqueFileIdentifierFrame{FrameHeader: header}
 	rest := make([]byte, frameSize)
 
-	err := binary.Read(r, binary.BigEndian, &rest)
+	err := binary.Read(r, binary.BigEndian, rest)
 	if err != nil {
 		return nil, err
 	}

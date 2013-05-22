@@ -204,7 +204,7 @@ func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 		}
 	)
 
-	err = readBinary(r, &bytes.Magic, &bytes.Version, &bytes.Flags, &bytes.Size)
+	err = binary.Read(r, binary.BigEndian, &bytes)
 	if err != nil {
 		return header, 0, err
 	}
@@ -237,7 +237,7 @@ func readFrame(r io.Reader) (Frame, error) {
 		header FrameHeader
 	)
 
-	err := readBinary(r, &headerBytes.ID, &headerBytes.Size, &headerBytes.Flags)
+	err := binary.Read(r, binary.BigEndian, &headerBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +280,7 @@ func readFrame(r io.Reader) (Frame, error) {
 	if header.id[0] == 'W' && header.id != "WXXX" {
 		frame := URLLinkFrame{FrameHeader: header}
 		url := make([]byte, frameSize)
-		err = binary.Read(r, binary.BigEndian, url)
+		_, err = r.Read(url)
 		if err != nil {
 			return nil, err
 		}

@@ -54,5 +54,17 @@ case of user text frames ("TXXX") where it expects a format of the
 kind "TXXX:The frame description" to address a specific user text
 frame.
 
+
+Encodings
+
+While ID3v2 allows a variety of encodings (ISO-8859-1, UTF-16 and in
+v2.4 also UTF-8), this library only supports writing UTF-8. When
+reading frames with different encodings, they will be converted to
+UTF-8.
+
+The rationale behind this is that UTF-8 is the encoding assumed by
+most of the Go standard library, and that the other encodings have no
+realistic benefits over UTF-8.
+
 */
 package id3

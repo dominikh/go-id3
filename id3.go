@@ -87,7 +87,7 @@ type File struct {
 	fileSize    int64
 	tagReader   io.ReadSeeker
 	audioReader io.ReadSeeker
-	hasTags     bool
+	HasTags     bool // true if the actual file has tags.
 	Header      TagHeader
 	Frames      FramesMap
 }
@@ -377,7 +377,7 @@ func (f *File) Parse() error {
 	if f.Header.Version < 0x0400 {
 		f.upgrade()
 	}
-	f.hasTags = true
+	f.HasTags = true
 	return nil
 }
 
@@ -945,7 +945,7 @@ func (f *File) saveNew(framesSize int) error {
 		return err
 	}
 
-	f.hasTags = true
+	f.HasTags = true
 	f.Header.Size = framesSize + Padding
 	f.Header.Version = 0x0400
 	return nil
@@ -958,7 +958,7 @@ func (f *File) Save() error {
 	f.SetTextFrameTime("TDTG", time.Now().UTC())
 	framesSize := f.Frames.size()
 
-	if f.hasTags && f.Header.Size >= framesSize && len(f.Frames) > 0 {
+	if f.HasTags && f.Header.Size >= framesSize && len(f.Frames) > 0 {
 		// The file already has tags and there's enough room to write
 		// ours.
 		Logging.Println("Writing in-place")

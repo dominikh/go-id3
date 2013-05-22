@@ -476,6 +476,12 @@ func (f *File) Validate() error {
 	return nil
 }
 
+// Sanitize will remove all frames that aren't valid. Check the
+// documentation of (*File).Validate() to see what "valid" means.
+func (f *File) Sanitize() {
+	panic("not implemented") // FIXME
+}
+
 func (f *File) Album() string {
 	return f.GetTextFrame("TALB")
 }

@@ -322,6 +322,8 @@ func readFrame(r io.Reader) (Frame, error) {
 		return readPRIVFrame(r, header, frameSize)
 	case "APIC":
 		return readAPICFrame(r, header, frameSize)
+	case "MCDI":
+		return readMCDIFrame(r, header, frameSize)
 	default:
 		data := make([]byte, frameSize)
 		n, err := r.Read(data)
@@ -1053,6 +1055,7 @@ func (fm FramesMap) size() int {
 }
 
 func (fm FramesMap) WriteTo(w io.Writer) (n int64, err error) {
+	// TODO write important frames first
 	for _, frames := range fm {
 		for _, frame := range frames {
 			nw, err := frame.WriteTo(w)

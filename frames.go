@@ -192,6 +192,11 @@ type PictureFrame struct {
 	Data        []byte
 }
 
+type MusicCDIdentifierFrame struct {
+	FrameHeader
+	TOC []byte
+}
+
 type UnsupportedFrame struct {
 	FrameHeader
 	Data []byte
@@ -377,6 +382,21 @@ func (f PictureFrame) WriteTo(w io.Writer) (n int64, err error) {
 	)
 }
 
+func (f MusicCDIdentifierFrame) Value() string {
+	return string(f.TOC)
+}
+
+func (f MusicCDIdentifierFrame) size() int {
+	return frameLength + len(f.TOC)
+}
+
+func (f MusicCDIdentifierFrame) WriteTo(w io.Writer) (n int64, err error) {
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		f.TOC,
+	)
+}
+
 func (f UnsupportedFrame) size() int {
 	return frameLength + len(f.Data)
 }
@@ -502,4 +522,11 @@ func readAPICFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	frame.Data = parts2[1]
 
 	return frame, nil
+}
+
+func readMCDIFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+	frame := MusicCDIdentifierFrame{FrameHeader: header}
+	frame.TOC = make([]byte, frameSize)
+	_, err := r.Read(frame.TOC)
+	return frame, err
 }

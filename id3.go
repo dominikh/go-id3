@@ -218,7 +218,7 @@ func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 		return TagHeader{}, 3, notATagHeader{bytes.Magic}
 	}
 	version := Version(int16(bytes.Version[0])<<8 | int16(bytes.Version[1]))
-	if bytes.Version[0] != 4 {
+	if bytes.Version[0] > 4 {
 		return TagHeader{}, 5, UnsupportedVersion{version}
 	}
 

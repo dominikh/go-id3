@@ -107,6 +107,30 @@ var FrameNames = map[FrameType]string{
 	"WXXX": "User defined URL link frame",
 }
 
+var PictureTypes = []string{
+	"Other",
+	"32x32 pixels 'file icon' (PNG only)",
+	"Other file icon",
+	"Cover (front)",
+	"Cover (back)",
+	"Leaflet page",
+	"Media (e.g. label side of CD)",
+	"Lead artist/lead performer/soloist",
+	"Artist/performer",
+	"Conductor",
+	"Band/Orchestra",
+	"Composer",
+	"Lyricist/text writer",
+	"Recording Location",
+	"During recording",
+	"During performance",
+	"Movie/video screen capture",
+	"A bright coloured fish",
+	"Illustration",
+	"Band/artist logotype",
+	"Publisher/Studio logotype",
+}
+
 type FrameHeader struct {
 	id    FrameType
 	flags FrameFlags
@@ -158,6 +182,14 @@ type PrivateFrame struct {
 	FrameHeader
 	Owner []byte
 	Data  []byte
+}
+
+type PictureFrame struct {
+	FrameHeader
+	MIMEType    string
+	PictureType PictureType
+	Description string
+	Data        []byte
 }
 
 type UnsupportedFrame struct {
@@ -317,6 +349,34 @@ func (f PrivateFrame) WriteTo(w io.Writer) (n int64, err error) {
 	)
 }
 
+func (f PictureFrame) Value() string {
+	return string(f.Data)
+}
+
+func (f PictureFrame) size() int {
+	return frameLength +
+		1 +
+		len(utf8ToISO88591([]byte(f.MIMEType))) +
+		len(nul) +
+		1 +
+		len(f.Description) +
+		len(nul) +
+		len(f.Data)
+}
+
+func (f PictureFrame) WriteTo(w io.Writer) (n int64, err error) {
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		utf8byte,
+		utf8ToISO88591([]byte(f.MIMEType)),
+		nul,
+		[]byte{byte(f.PictureType)},
+		[]byte(f.Description),
+		nul,
+		f.Data,
+	)
+}
+
 func (f UnsupportedFrame) size() int {
 	return frameLength + len(f.Data)
 }
@@ -417,6 +477,29 @@ func readPRIVFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	parts := bytes.SplitN(data, nul, 2)
 	frame.Owner = parts[0]
 	frame.Data = parts[1]
+
+	return frame, nil
+}
+
+func readAPICFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+	frame := PictureFrame{FrameHeader: header}
+	var (
+		encoding Encoding
+		rest     []byte
+	)
+	rest = make([]byte, frameSize-1)
+	err := readBinary(r, &encoding, &rest)
+	if err != nil {
+		return frame, err
+	}
+
+	parts1 := bytes.SplitN(rest, nul, 2)
+	parts2 := splitNullN(parts1[1][1:], encoding, 2)
+
+	frame.MIMEType = string(iso88591ToUTF8(parts1[0]))
+	frame.PictureType = PictureType(parts1[1][0])
+	frame.Description = string(reencode(parts2[0], encoding))
+	frame.Data = parts2[1]
 
 	return frame, nil
 }

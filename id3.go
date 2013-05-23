@@ -67,6 +67,7 @@ type Version int16
 type Encoding byte
 type FrameType string
 type FramesMap map[FrameType][]Frame
+type PictureType byte
 
 type notATagHeader struct {
 	Magic [3]byte
@@ -105,6 +106,14 @@ func (f FrameType) String() string {
 	}
 
 	return string(f)
+}
+
+func (p PictureType) String() string {
+	if int(p) >= len(PictureTypes) {
+		return ""
+	}
+
+	return PictureTypes[p]
 }
 
 func (e Encoding) String() string {
@@ -311,6 +320,8 @@ func readFrame(r io.Reader) (Frame, error) {
 		return readCOMMFrame(r, header, frameSize)
 	case "PRIV":
 		return readPRIVFrame(r, header, frameSize)
+	case "APIC":
+		return readAPICFrame(r, header, frameSize)
 	default:
 		data := make([]byte, frameSize)
 		n, err := r.Read(data)

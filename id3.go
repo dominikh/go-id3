@@ -324,6 +324,8 @@ func readFrame(r io.Reader) (Frame, error) {
 		return readAPICFrame(r, header, frameSize)
 	case "MCDI":
 		return readMCDIFrame(r, header, frameSize)
+	case "USLT":
+		return readUFIDFrame(r, header, frameSize)
 	default:
 		data := make([]byte, frameSize)
 		n, err := r.Read(data)

@@ -197,6 +197,13 @@ type MusicCDIdentifierFrame struct {
 	TOC []byte
 }
 
+type UnsynchronisedLyricsFrame struct {
+	FrameHeader
+	Language    string
+	Description string
+	Lyrics      string
+}
+
 type UnsupportedFrame struct {
 	FrameHeader
 	Data []byte
@@ -397,6 +404,25 @@ func (f MusicCDIdentifierFrame) WriteTo(w io.Writer) (n int64, err error) {
 	)
 }
 
+func (f UnsynchronisedLyricsFrame) Value() string {
+	return f.Lyrics
+}
+
+func (f UnsynchronisedLyricsFrame) size() int {
+	return frameLength + 5 + len(f.Description) + len(f.Lyrics)
+}
+
+func (f UnsynchronisedLyricsFrame) WriteTo(w io.Writer) (n int64, err error) {
+	return writeMany(w,
+		f.FrameHeader.serialize(f.size()-frameLength),
+		utf8byte,
+		[]byte(f.Language),
+		[]byte(f.Description),
+		nul,
+		[]byte(f.Lyrics),
+	)
+}
+
 func (f UnsupportedFrame) size() int {
 	return frameLength + len(f.Data)
 }
@@ -529,4 +555,26 @@ func readMCDIFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	frame.TOC = make([]byte, frameSize)
 	_, err := r.Read(frame.TOC)
 	return frame, err
+}
+
+func readUSLTFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+	frame := UnsynchronisedLyricsFrame{FrameHeader: header}
+	var (
+		encoding Encoding
+		language [3]byte
+		rest     []byte
+	)
+	rest = make([]byte, frameSize-4)
+
+	err := readBinary(r, &encoding, &language, rest)
+	if err != nil {
+		return frame, err
+	}
+
+	parts := splitNullN(rest, encoding, 2)
+	frame.Language = string(language[:])
+	frame.Description = string(reencode(parts[0], encoding))
+	frame.Lyrics = string(reencode(parts[1], encoding))
+
+	return frame, nil
 }

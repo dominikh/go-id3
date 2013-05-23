@@ -1120,8 +1120,32 @@ func intToBytes(i int) []byte {
 }
 
 func splitNullN(data []byte, encoding Encoding, n int) [][]byte {
-	delim := encoding.terminator()
-	return bytes.SplitN(data, delim, n)
+	if encoding == utf8 || encoding == iso88591 {
+		return bytes.SplitN(data, nul, n)
+	}
+
+	var (
+		matches [][]byte
+		prev    int
+	)
+
+	for i := 0; i < len(data); i += 2 {
+		// TODO if there's no data[i+1] then this is malformed data
+		// and we should return an error
+		if data[i] == 0 && data[i+1] == 0 {
+			matches = append(matches, data[prev:i])
+
+			if len(matches) == n-1 {
+				break
+			}
+		}
+	}
+
+	if prev < len(data)-1 {
+		matches = append(matches, data[prev:])
+	}
+
+	return matches
 }
 
 func reencode(b []byte, encoding Encoding) []byte {

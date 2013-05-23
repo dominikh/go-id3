@@ -1149,19 +1149,24 @@ func splitNullN(data []byte, encoding Encoding, n int) [][]byte {
 }
 
 func reencode(b []byte, encoding Encoding) []byte {
-	// FIXME: strip trailing null byte
 	var ret []byte
 	switch encoding {
 	case utf16bom, utf16be:
-		return utf16ToUTF8(b)
+		ret = utf16ToUTF8(b)
 	case utf8:
 		ret = make([]byte, len(b))
 		copy(ret, b)
-		return ret
 	case iso88591:
-		return iso88591ToUTF8(b)
+		ret = iso88591ToUTF8(b)
+	default:
+		panic("unsupported")
 	}
-	panic("unsupported")
+
+	if len(ret) > 0 && ret[len(ret)-1] == 0 {
+		return ret[:len(ret)-1]
+	}
+
+	return ret
 }
 
 func utf16ToUTF8(input []byte) []byte {

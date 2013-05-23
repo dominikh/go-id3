@@ -245,6 +245,11 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	err := binary.Read(r, binary.BigEndian, &headerBytes)
 	if err != nil {
+		if err == io.ErrUnexpectedEOF {
+			// If we couldn't read the header assume we were at the
+			// end of the tag.
+			return nil, io.EOF
+		}
 		return nil, err
 	}
 

@@ -69,6 +69,14 @@ type FrameType string
 type FramesMap map[FrameType][]Frame
 type PictureType byte
 
+type NotAFrameHeader struct {
+	Bytes struct {
+		ID    [4]byte
+		Size  [4]byte
+		Flags [2]byte
+	}
+}
+
 type notATagHeader struct {
 	Magic [3]byte
 }
@@ -145,6 +153,10 @@ func (e Encoding) terminator() []byte {
 
 func (err notATagHeader) Error() string {
 	return fmt.Sprintf("Not an ID3v2 header: %v", err.Magic)
+}
+
+func (err NotAFrameHeader) Error() string {
+	return fmt.Sprintf("Not a frame header (ID = %v)", err.Bytes.ID)
 }
 
 func (err UnsupportedVersion) Error() string {
@@ -262,6 +274,25 @@ func readFrame(r io.Reader) (Frame, error) {
 		return nil, err
 	}
 
+	// We're in the padding, return io.EOF
+	if headerBytes.ID == [4]byte{0, 0, 0, 0} {
+		return nil, io.EOF
+	}
+
+	for _, byte := range headerBytes.ID {
+		// Allow 0-9
+		if byte >= 48 && byte <= 57 {
+			continue
+		}
+
+		// Allow A-Z
+		if byte >= 65 && byte <= 90 {
+			continue
+		}
+
+		return nil, NotAFrameHeader{headerBytes}
+	}
+
 	header.id = FrameType(headerBytes.ID[:])
 	header.flags = FrameFlags(int16(headerBytes.Flags[0])<<8 | int16(headerBytes.Flags[1]))
 	frameSize := desynchsafeInt(headerBytes.Size)
@@ -276,11 +307,6 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	if header.flags.Grouped() {
 		// TODO: Read group identifier (1 byte)
-	}
-
-	// We're in the padding, return io.EOF
-	if header.id[0] == 0 {
-		return nil, io.EOF
 	}
 
 	if header.id[0] == 'T' && header.id != "TXXX" {

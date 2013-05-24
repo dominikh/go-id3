@@ -85,5 +85,15 @@ In the first case, parsing of the entire tag will be aborted because
 it cannot be ensured that bad things won't happen.
 
 In the second case only that specific frame will be dropped.
+
+
+Unsupported frames
+
+Unsupported frames, like extensions by Apple, will be left untouched,
+meaning that they will be read and written as raw byte slices. If you
+know how to handle them, you can write your own function to parse and
+modify the content. All unsupported frames will be of type
+UnsupportedFrame.
+
 */
 package id3

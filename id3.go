@@ -298,14 +298,17 @@ func readFrame(r io.Reader) (Frame, error) {
 	frameSize := desynchsafeInt(headerBytes.Size)
 
 	if header.flags.Compressed() {
+		panic("not implemented: cannot read compressed frame")
 		// TODO: Read decompressed size (4 bytes)
 	}
 
 	if header.flags.Encrypted() {
+		panic("not implemented: cannot read encrypted frame")
 		// TODO: Read encryption method (1 byte)
 	}
 
 	if header.flags.Grouped() {
+		panic("not implemented: cannot read grouped frame")
 		// TODO: Read group identifier (1 byte)
 	}
 
@@ -430,6 +433,14 @@ func (f *File) Parse() error {
 	err := f.ParseHeader()
 	if err != nil {
 		return err
+	}
+
+	if f.Header.Flags.ExtendedHeader() {
+		panic("not implemented: cannot parse extended header")
+	}
+
+	if f.Header.Flags.Unsynchronisation() {
+		panic("not implemented: cannot parse unsynchronised tag")
 	}
 
 	for {

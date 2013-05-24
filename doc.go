@@ -66,5 +66,24 @@ The rationale behind this is that UTF-8 is the encoding assumed by
 most of the Go standard library, and that the other encodings have no
 realistic benefits over UTF-8.
 
+
+Behaviour when encounterind invalid data
+
+There are two kinds of invalid data that can be encountered: Data that
+doesn't look like a valid frame, and data that is invalid in the
+context of its frame.
+
+An example for the first case is a frame identifier that doesn't
+consist of only A-Z0-9. That usually happens when other programs wrote
+invalid data. One common case are wrongly encoded sizes, which will
+cause us to read random binary data.
+
+An example for the second case is text that isn't valid according to
+the specified encoding.
+
+In the first case, parsing of the entire tag will be aborted because
+it cannot be ensured that bad things won't happen.
+
+In the second case only that specific frame will be dropped.
 */
 package id3

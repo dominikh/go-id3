@@ -1346,7 +1346,7 @@ func generateHeader(size int) []byte {
 	return buf.Bytes()
 }
 
-func frameNameToUserFrame(name FrameType) (string, bool) {
+func frameNameToUserFrame(name FrameType) (frameName string, ok bool) {
 	if len(name) < 6 {
 		return "", false
 	}

@@ -20,6 +20,10 @@ var Padding = 1024
 // Enables logging if set to true.
 var Logging LogFlag
 
+// The size limit in bytes for in-memory buffers when rewriting files before
+// falling back to temporary files.
+var InMemoryThreshold = int64(1024 * 1024 * 10)
+
 type LogFlag bool
 
 func (l LogFlag) Println(args ...interface{}) {
@@ -1023,7 +1027,7 @@ func (f *File) saveNew(framesSize int) error {
 
 	// Work in memory If the old file was smaller than 10MiB, use
 	// a temporary file otherwise.
-	if f.fileSize < 10*1024*1024 {
+	if f.fileSize < InMemoryThreshold {
 		Logging.Println("Working in memory")
 		buf = new(bytes.Buffer)
 	} else {

@@ -1067,8 +1067,10 @@ func (f *File) saveNew(framesSize int) error {
 }
 
 // Save saves the tags to the file. If the changed tags fit into the
-// existing file, they will be overwritten in place. Otherwise a new
-// file will be created and moved over the old file.
+// existing file, they will be overwritten in place. Otherwise the
+// entire file will be rewritten.
+//
+// If you require backups, you need to create them yourself.
 func (f *File) Save() error {
 	f.SetTextFrameTime("TDTG", time.Now().UTC())
 	framesSize := f.Frames.size()

@@ -435,6 +435,7 @@ func (f *File) Parse() error {
 		return err
 	}
 
+	// FIXME consider moving this to ParseHeader
 	if f.Header.Flags.ExtendedHeader() {
 		panic("not implemented: cannot parse extended header")
 	}
@@ -458,6 +459,8 @@ func (f *File) Parse() error {
 	if f.Header.Version < 0x0400 {
 		f.upgrade()
 	}
+
+	// FIXME consider moving this to ParseHeader
 	f.HasTags = true
 	return nil
 }

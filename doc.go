@@ -1,6 +1,19 @@
 /*
 Foo bar.
 
+Nomenclature
+
+ID3 uses nomenclature that might be counterintuitive to people not
+familiar with it. Because this library uses the same choice of words
+the following list of clarifications is included.
+
+  tag: In ID3, tag means the entire set of metadata, not just one
+       field of it.
+
+  frame: A frame describes a single piece of information, for example
+         a song's title.
+
+
 Supported versions
 
 This library supports reading v2.3 and v2.4 tags, but only writing
@@ -10,6 +23,7 @@ The primary reason for not allowing writing older versions is that
 they cannot represent all data that is available with v2.4, and
 designing the API in a way that's both user friendly and able to
 reject data is not worth the trouble.
+
 
 Automatic upgrading
 

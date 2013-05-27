@@ -149,10 +149,10 @@ func BenchmarkUTF16ToUTF8(b *testing.B) {
 	}
 }
 
-func ExampleFile_GetTextFrame_text(f File) {
-	f.GetTextFrame("TIT2") // Same as f.Title()
+func ExampleTag_GetTextFrame_text(t *Tag) {
+	t.GetTextFrame("TIT2") // Same as f.Title()
 }
 
-func ExampleFile_GetTextFrame_user(f File) {
-	f.GetTextFrame("TXXX:MusicBrainz Album Artist Id")
+func ExampleTag_GetTextFrame_user(t *Tag) {
+	t.GetTextFrame("TXXX:MusicBrainz Album Artist Id")
 }

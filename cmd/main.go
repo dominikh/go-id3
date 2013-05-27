@@ -8,19 +8,15 @@ import (
 
 func main() {
 	id3.Logging = true
-	tags, err := id3.Open(os.Args[1])
+	file, err := id3.Open(os.Args[1])
 	if err != nil {
 		panic(err)
 	}
 
-	err = tags.Parse()
-	if err != nil {
-		panic(err)
-	}
-
-	tags.Clear() // Remove all existing tags
-	tags.SetArtists([]string{"dominikh", "some other güy"})
-	fmt.Println(tags.Save())
+	file.Clear() // Remove all existing tags
+	file.SetArtists([]string{"me", "you"})
+	file.SetAlbum("Yippey")
+	fmt.Println(file.Save())
 	// tags.SetTitle("A test file.")
 	// tags.SetAlbum("Proud test productions")
 	// tags.SetArtist("dominikh")

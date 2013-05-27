@@ -38,7 +38,8 @@ const (
 	utf16be  = 2
 	utf8     = 3
 
-	frameLength = 10
+	frameLength   = 10
+	tagHeaderSize = 10
 )
 
 var (
@@ -95,20 +96,28 @@ type TagHeader struct {
 	Size    int // The size of the tag (exluding the size of the header)
 }
 
+type Tag struct {
+	Header TagHeader
+	Frames FramesMap
+}
+
 type File struct {
 	f           *os.File
 	fileSize    int64
-	tagReader   io.ReadSeeker
 	audioReader io.ReadSeeker
 	HasTags     bool // true if the actual file has tags
-	Header      TagHeader
-	Frames      FramesMap
+	*Tag
 }
 
 type Comment struct {
 	Language    string
 	Description string
 	Text        string
+}
+
+// NewTag returns an empty tag.
+func NewTag() *Tag {
+	return &Tag{Frames: make(FramesMap)}
 }
 
 func (f FrameType) String() string {
@@ -223,9 +232,8 @@ func readBinary(r io.Reader, args ...interface{}) (err error) {
 }
 
 // readHeader reads an ID3v2 header. It expects the reader to be
-// seeked to the beginning of the header. When an error is returned, n
-// will always be zero.
-func readHeader(r io.Reader) (header TagHeader, n int, err error) {
+// seeked to the beginning of the header.
+func readHeader(r io.Reader) (header TagHeader, err error) {
 	var (
 		bytes struct {
 			Magic   [3]byte
@@ -237,21 +245,21 @@ func readHeader(r io.Reader) (header TagHeader, n int, err error) {
 
 	err = binary.Read(r, binary.BigEndian, &bytes)
 	if err != nil {
-		return header, 0, err
+		return header, err
 	}
 	if bytes.Magic != [3]byte{0x49, 0x44, 0x33} {
-		return TagHeader{}, 3, notATagHeader{bytes.Magic}
+		return TagHeader{}, notATagHeader{bytes.Magic}
 	}
 	version := Version(int16(bytes.Version[0])<<8 | int16(bytes.Version[1]))
 	if bytes.Version[0] > 4 {
-		return TagHeader{}, 5, UnsupportedVersion{version}
+		return TagHeader{}, UnsupportedVersion{version}
 	}
 
 	header.Version = version
 	header.Flags = HeaderFlags(bytes.Flags)
 	header.Size = desynchsafeInt(bytes.Size)
 
-	return header, 10, nil
+	return header, nil
 }
 
 // readFrame reads the next ID3 frame. It expects the reader to be
@@ -370,123 +378,131 @@ func readFrame(r io.Reader) (Frame, error) {
 	}
 }
 
-// New creates a new file from an existing *os.File. If you plan to save
-// tags the file needs to be openes read and write, otherwise read
-// suffices.
-//
-// You need to call either Parse or ParseHeader before working
-// with the returned file.
-func New(file *os.File) (*File, error) {
+// New creates a new file from an existing *os.File and Tag. If you
+// plan to save tags the file needs to be opened read and write.
+func NewFile(file *os.File, tag *Tag) (*File, error) {
 	stat, err := file.Stat()
 	if err != nil {
 		return nil, err
 	}
 
-	return &File{
+	f := &File{
 		f:        file,
 		fileSize: stat.Size(),
-		Frames:   make(FramesMap),
-	}, nil
+		Tag:      tag,
+	}
+
+	f.audioReader = io.NewSectionReader(file, tagHeaderSize+int64(tag.Header.Size), f.fileSize-int64(tag.Header.Size))
+
+	return f, nil
 }
 
-// Open opens the file in read and write mode.
+// Open opens the file with the given name in RW mode and parses its
+// tag. If there is no tag, (*File).HasTag() will return false.
 //
 // Call Close() to close the underlying *os.File when done.
-//
-// You need to call either Parse or ParseHeader before working with
-// the returned file.
 func Open(name string) (*File, error) {
 	f, err := os.OpenFile(name, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := New(f)
-	return file, err
+	tag, err := Parse(f)
+	if err != nil {
+		if _, ok := err.(notATagHeader); !ok {
+			return nil, err
+		}
+	}
+	file, err := NewFile(f, tag)
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
 }
 
-// Close closes the underlying os.File. You cannot use Save or Parse
+// HasTag returns true when the underlying file has a tag.
+func (f *File) HasTag() bool {
+	return f.Tag.Header.Version > 0
+}
+
+// Close closes the underlying os.File. You cannot use Save
 // afterwards.
 func (f *File) Close() error {
 	return f.f.Close()
 }
 
-// ParseHeader parses only the ID3 header of the file.
-//
-// This can be useful if you're not interested in the existing tag but
-// want to write your own. In that case, parsing the header is still
-// required to be able to overwrite the existing tag.
-func (f *File) ParseHeader() error {
-	header, n, err := readHeader(f.f)
-	f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
-	f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
+// ParseHeader parses only the ID3 header.
+func ParseHeader(r io.Reader) (TagHeader, error) {
+	header, err := readHeader(r)
+	// f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
+	// f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
 	if err != nil {
-		if _, ok := err.(notATagHeader); ok {
-			return nil
-		}
-		return err
+		return TagHeader{}, err
 	}
 
-	f.Header = header
-	return nil
+	return header, nil
 }
 
-// Parse parses the file's tags. If you only want to parse the header,
-// use ParseHeader instead.
-func (f *File) Parse() error {
-	err := f.ParseHeader()
+// Parse parses a tag.
+//
+// Parse will always return a valid tag. In the case of an error, the
+// tag will be empty.
+func Parse(r io.Reader) (*Tag, error) {
+	tag := NewTag()
+	header, err := ParseHeader(r)
 	if err != nil {
-		return err
+		return tag, err
 	}
+	tag.Header = header
 
 	// FIXME consider moving this to ParseHeader
-	if f.Header.Flags.ExtendedHeader() {
+	if header.Flags.ExtendedHeader() {
 		panic("not implemented: cannot parse extended header")
 	}
 
-	if f.Header.Flags.Unsynchronisation() {
+	if header.Flags.Unsynchronisation() {
 		panic("not implemented: cannot parse unsynchronised tag")
 	}
 
+	tagReader := io.LimitReader(r, int64(header.Size)+tagHeaderSize)
 	for {
-		frame, err := readFrame(f.tagReader)
+		frame, err := readFrame(tagReader)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 
-			return err
+			return tag, err
 		}
-		f.Frames[frame.ID()] = append(f.Frames[frame.ID()], frame)
+		tag.Frames[frame.ID()] = append(tag.Frames[frame.ID()], frame)
 	}
 
-	if f.Header.Version < 0x0400 {
-		f.upgrade()
+	if header.Version < 0x0400 {
+		tag.upgrade()
 	}
 
-	// FIXME consider moving this to ParseHeader
-	f.HasTags = true
-	return nil
+	return tag, nil
 }
 
 // upgrade upgrades tags from an older version to IDv2.4. It should
 // only be called for files that use an older version.
-func (f *File) upgrade() {
+func (t *Tag) upgrade() {
 	// Upgrade TYER/TDAT/TIME to TDRC if at least
 	// one of TYER, TDAT or TIME are set.
-	if f.HasFrame("TYER") || f.HasFrame("TDAT") || f.HasFrame("TIME") {
+	if t.HasFrame("TYER") || t.HasFrame("TDAT") || t.HasFrame("TIME") {
 		Logging.Println("Replacing TYER, TDAT and TIME with TDRC...")
 
-		year := f.GetTextFrameNumber("TYER")
-		date := f.GetTextFrame("TDAT")
-		t := f.GetTextFrame("TIME")
+		year := t.GetTextFrameNumber("TYER")
+		date := t.GetTextFrame("TDAT")
+		tim := t.GetTextFrame("TIME")
 
 		if len(date) != 4 {
 			date = "0101"
 		}
 
-		if len(t) != 4 {
-			t = "0000"
+		if len(tim) != 4 {
+			tim = "0000"
 		}
 
 		day, _ := strconv.Atoi(date[0:2])
@@ -494,30 +510,30 @@ func (f *File) upgrade() {
 		hour, _ := strconv.Atoi(date[0:2])
 		minute, _ := strconv.Atoi(date[2:])
 
-		f.SetRecordingTime(time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.UTC))
-		f.RemoveFrames("TYER")
-		f.RemoveFrames("TDAT")
-		f.RemoveFrames("TIME")
+		t.SetRecordingTime(time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.UTC))
+		t.RemoveFrames("TYER")
+		t.RemoveFrames("TDAT")
+		t.RemoveFrames("TIME")
 	}
 
 	// Upgrade Original Release Year to Original Release Time
-	if !f.HasFrame("TDOR") {
-		if f.HasFrame("XDOR") {
+	if !t.HasFrame("TDOR") {
+		if t.HasFrame("XDOR") {
 			Logging.Println("Replacing XDOR with TDOR")
 			panic("not implemented") // FIXME
-		} else if f.HasFrame("TORY") {
+		} else if t.HasFrame("TORY") {
 			Logging.Println("Replacing TORY with TDOR")
 
-			year := f.GetTextFrameNumber("TORY")
-			f.SetOriginalReleaseTime(time.Date(year, 0, 0, 0, 0, 0, 0, time.UTC))
+			year := t.GetTextFrameNumber("TORY")
+			t.SetOriginalReleaseTime(time.Date(year, 0, 0, 0, 0, 0, 0, time.UTC))
 		}
 	}
 
-	for name, _ := range f.Frames {
+	for name, _ := range t.Frames {
 		switch name {
 		case "TLAN", "TCON", "TPE1", "TOPE", "TCOM", "TEXT", "TOLY":
 			Logging.Println("Replacing / with x00 for", name)
-			f.SetTextFrameSlice(name, strings.Split(f.GetTextFrame(name), "/"))
+			t.SetTextFrameSlice(name, strings.Split(t.GetTextFrame(name), "/"))
 		}
 	}
 	// TODO EQUA → EQU2
@@ -527,12 +543,12 @@ func (f *File) upgrade() {
 }
 
 // Clear removes all tags from the file.
-func (f *File) Clear() {
-	f.Frames = make(FramesMap)
+func (t *Tag) Clear() {
+	t.Frames = make(FramesMap)
 }
 
-func (f *File) RemoveFrames(name FrameType) {
-	delete(f.Frames, name)
+func (t *Tag) RemoveFrames(name FrameType) {
+	delete(t.Frames, name)
 }
 
 // Validate checks whether the tags are conforming to the
@@ -551,13 +567,13 @@ func (f *File) RemoveFrames(name FrameType) {
 // Assuming that the original file was valid and that only the
 // getter/setter methods were used the generated tags should always be
 // valid.
-func (f *File) Validate() error {
+func (t *Tag) Validate() error {
 	// TODO consider returning a list of errors, one per invalid frame,
 	// specifying the reason
 
 	panic("not implemented") // FIXME
 
-	if f.HasFrame("TSRC") && len(f.GetTextFrame("TSRC")) != 12 {
+	if t.HasFrame("TSRC") && len(t.GetTextFrame("TSRC")) != 12 {
 		// TODO invalid TSRC frame
 	}
 
@@ -566,28 +582,28 @@ func (f *File) Validate() error {
 
 // Sanitize will remove all frames that aren't valid. Check the
 // documentation of (*File).Validate() to see what "valid" means.
-func (f *File) Sanitize() {
+func (t *Tag) Sanitize() {
 	panic("not implemented") // FIXME
 }
 
-func (f *File) Album() string {
-	return f.GetTextFrame("TALB")
+func (t *Tag) Album() string {
+	return t.GetTextFrame("TALB")
 }
 
-func (f *File) SetAlbum(album string) {
-	f.SetTextFrame("TALB", album)
+func (t *Tag) SetAlbum(album string) {
+	t.SetTextFrame("TALB", album)
 }
 
-func (f *File) Artists() []string {
-	return f.GetTextFrameSlice("TPE1")
+func (t *Tag) Artists() []string {
+	return t.GetTextFrameSlice("TPE1")
 }
 
-func (f *File) SetArtists(artists []string) {
-	f.SetTextFrameSlice("TPE1", artists)
+func (t *Tag) SetArtists(artists []string) {
+	t.SetTextFrameSlice("TPE1", artists)
 }
 
-func (f *File) Artist() string {
-	artists := f.Artists()
+func (t *Tag) Artist() string {
+	artists := t.Artists()
 	if len(artists) > 0 {
 		return artists[0]
 	}
@@ -595,36 +611,36 @@ func (f *File) Artist() string {
 	return ""
 }
 
-func (f *File) SetArtist(artist string) {
-	f.SetTextFrame("TPE1", artist)
+func (t *Tag) SetArtist(artist string) {
+	t.SetTextFrame("TPE1", artist)
 }
 
-func (f *File) Band() string {
-	return f.GetTextFrame("TPE2")
+func (t *Tag) Band() string {
+	return t.GetTextFrame("TPE2")
 }
 
-func (f *File) SetBand(band string) {
-	f.SetTextFrame("TPE2", band)
+func (t *Tag) SetBand(band string) {
+	t.SetTextFrame("TPE2", band)
 }
 
-func (f *File) Conductor() string {
-	return f.GetTextFrame("TPE3")
+func (t *Tag) Conductor() string {
+	return t.GetTextFrame("TPE3")
 }
 
-func (f *File) SetConductor(name string) {
-	f.SetTextFrame("TPE3", name)
+func (t *Tag) SetConductor(name string) {
+	t.SetTextFrame("TPE3", name)
 }
 
-func (f *File) OriginalArtists() []string {
-	return f.GetTextFrameSlice("TOPE")
+func (t *Tag) OriginalArtists() []string {
+	return t.GetTextFrameSlice("TOPE")
 }
 
-func (f *File) SetOriginalArtists(names []string) {
-	f.SetTextFrameSlice("TOPE", names)
+func (t *Tag) SetOriginalArtists(names []string) {
+	t.SetTextFrameSlice("TOPE", names)
 }
 
-func (f *File) OriginalArtist() string {
-	artists := f.OriginalArtists()
+func (t *Tag) OriginalArtist() string {
+	artists := t.OriginalArtists()
 	if len(artists) > 0 {
 		return artists[0]
 	}
@@ -632,28 +648,28 @@ func (f *File) OriginalArtist() string {
 	return ""
 }
 
-func (f *File) SetOriginalArtist(name string) {
-	f.SetTextFrame("TOPE", name)
+func (t *Tag) SetOriginalArtist(name string) {
+	t.SetTextFrame("TOPE", name)
 }
 
-func (f *File) BPM() int {
-	return f.GetTextFrameNumber("TBPM")
+func (t *Tag) BPM() int {
+	return t.GetTextFrameNumber("TBPM")
 }
 
-func (f *File) SetBPM(bpm int) {
-	f.SetTextFrameNumber("TBPM", bpm)
+func (t *Tag) SetBPM(bpm int) {
+	t.SetTextFrameNumber("TBPM", bpm)
 }
 
-func (f *File) Composers() []string {
-	return f.GetTextFrameSlice("TCOM")
+func (t *Tag) Composers() []string {
+	return t.GetTextFrameSlice("TCOM")
 }
 
-func (f *File) SetComposers(composers []string) {
-	f.SetTextFrameSlice("TCOM", composers)
+func (t *Tag) SetComposers(composers []string) {
+	t.SetTextFrameSlice("TCOM", composers)
 }
 
-func (f *File) Composer() string {
-	composers := f.Composers()
+func (t *Tag) Composer() string {
+	composers := t.Composers()
 	if len(composers) > 0 {
 		return composers[0]
 	}
@@ -661,34 +677,34 @@ func (f *File) Composer() string {
 	return ""
 }
 
-func (f *File) SetComposer(composer string) {
-	f.SetTextFrame("TCOM", composer)
+func (t *Tag) SetComposer(composer string) {
+	t.SetTextFrame("TCOM", composer)
 }
 
-func (f *File) Title() string {
-	return f.GetTextFrame("TIT2")
+func (t *Tag) Title() string {
+	return t.GetTextFrame("TIT2")
 }
 
-func (f *File) SetTitle(title string) {
-	f.SetTextFrame("TIT2", title)
+func (t *Tag) SetTitle(title string) {
+	t.SetTextFrame("TIT2", title)
 }
 
-func (f *File) Length() time.Duration {
+func (t *Tag) Length() time.Duration {
 	// TODO if TLEN frame doesn't exist determine the length by
 	// parsing the underlying audio file
-	return time.Duration(f.GetTextFrameNumber("TLEN")) * time.Millisecond
+	return time.Duration(t.GetTextFrameNumber("TLEN")) * time.Millisecond
 }
 
-func (f *File) SetLength(d time.Duration) {
-	f.SetTextFrameNumber("TLEN", int(d.Nanoseconds()/1e6))
+func (t *Tag) SetLength(d time.Duration) {
+	t.SetTextFrameNumber("TLEN", int(d.Nanoseconds()/1e6))
 }
 
-func (f *File) Languages() []string {
-	return f.GetTextFrameSlice("TLAN")
+func (t *Tag) Languages() []string {
+	return t.GetTextFrameSlice("TLAN")
 }
 
-func (f *File) Language() string {
-	langs := f.Languages()
+func (t *Tag) Language() string {
+	langs := t.Languages()
 	if len(langs) == 0 {
 		return ""
 	}
@@ -696,128 +712,128 @@ func (f *File) Language() string {
 	return langs[0]
 }
 
-func (f *File) SetLanguages(langs []string) {
-	f.SetTextFrameSlice("TLAN", langs)
+func (t *Tag) SetLanguages(langs []string) {
+	t.SetTextFrameSlice("TLAN", langs)
 }
 
-func (f *File) SetLanguage(lang string) {
-	f.SetTextFrame("TLAN", lang)
+func (t *Tag) SetLanguage(lang string) {
+	t.SetTextFrame("TLAN", lang)
 }
 
-func (f *File) Publisher() string {
-	return f.GetTextFrame("TPUB")
+func (t *Tag) Publisher() string {
+	return t.GetTextFrame("TPUB")
 }
 
-func (f *File) SetPublisher(publisher string) {
-	f.SetTextFrame("TPUB", publisher)
+func (t *Tag) SetPublisher(publisher string) {
+	t.SetTextFrame("TPUB", publisher)
 }
 
-func (f *File) StationName() string {
-	return f.GetTextFrame("TRSN")
+func (t *Tag) StationName() string {
+	return t.GetTextFrame("TRSN")
 }
 
-func (f *File) SetStationName(name string) {
-	f.SetTextFrame("TRSN", name)
+func (t *Tag) SetStationName(name string) {
+	t.SetTextFrame("TRSN", name)
 }
 
-func (f *File) StationOwner() string {
-	return f.GetTextFrame("TRSO")
+func (t *Tag) StationOwner() string {
+	return t.GetTextFrame("TRSO")
 }
 
-func (f *File) SetStationOwner(owner string) {
-	f.SetTextFrame("TRSO", owner)
+func (t *Tag) SetStationOwner(owner string) {
+	t.SetTextFrame("TRSO", owner)
 }
 
-func (f *File) Owner() string {
-	return f.GetTextFrame("TOWN")
+func (t *Tag) Owner() string {
+	return t.GetTextFrame("TOWN")
 }
 
-func (f *File) SetOwner(owner string) {
-	f.SetTextFrame("TOWN", owner)
+func (t *Tag) SetOwner(owner string) {
+	t.SetTextFrame("TOWN", owner)
 }
 
-func (f *File) RecordingTime() time.Time {
-	return f.GetTextFrameTime("TDRC")
+func (t *Tag) RecordingTime() time.Time {
+	return t.GetTextFrameTime("TDRC")
 }
 
-func (f *File) SetRecordingTime(t time.Time) {
-	f.SetTextFrameTime("TDRC", t)
+func (tag *Tag) SetRecordingTime(t time.Time) {
+	tag.SetTextFrameTime("TDRC", t)
 }
 
-func (f *File) OriginalReleaseTime() time.Time {
-	return f.GetTextFrameTime("TDOR")
+func (t *Tag) OriginalReleaseTime() time.Time {
+	return t.GetTextFrameTime("TDOR")
 }
 
-func (f *File) SetOriginalReleaseTime(t time.Time) {
-	f.SetTextFrameTime("TDOR", t)
+func (tag *Tag) SetOriginalReleaseTime(t time.Time) {
+	tag.SetTextFrameTime("TDOR", t)
 }
 
-func (f *File) OriginalFilename() string {
-	return f.GetTextFrame("TOFN")
+func (t *Tag) OriginalFilename() string {
+	return t.GetTextFrame("TOFN")
 }
 
-func (f *File) SetOriginalFilename(name string) {
-	f.SetTextFrame("TOFN", name)
+func (t *Tag) SetOriginalFilename(name string) {
+	t.SetTextFrame("TOFN", name)
 }
 
-func (f *File) PlaylistDelay() time.Duration {
-	return time.Duration(f.GetTextFrameNumber("TDLY")) * time.Millisecond
+func (t *Tag) PlaylistDelay() time.Duration {
+	return time.Duration(t.GetTextFrameNumber("TDLY")) * time.Millisecond
 }
 
-func (f *File) SetPlaylistDelay(d time.Duration) {
-	f.SetTextFrameNumber("TDLY", int(d.Nanoseconds()/1e6))
+func (t *Tag) SetPlaylistDelay(d time.Duration) {
+	t.SetTextFrameNumber("TDLY", int(d.Nanoseconds()/1e6))
 }
 
-func (f *File) EncodingTime() time.Time {
-	return f.GetTextFrameTime("TDEN")
+func (t *Tag) EncodingTime() time.Time {
+	return t.GetTextFrameTime("TDEN")
 }
 
-func (f *File) SetEncodingTime(t time.Time) {
-	f.SetTextFrameTime("TDEN", t)
+func (tag *Tag) SetEncodingTime(t time.Time) {
+	tag.SetTextFrameTime("TDEN", t)
 }
 
-func (f *File) AlbumSortOrder() string {
-	return f.GetTextFrame("TSOA")
+func (t *Tag) AlbumSortOrder() string {
+	return t.GetTextFrame("TSOA")
 }
 
-func (f *File) SetAlbumSortOrder(s string) {
-	f.SetTextFrame("TSOA", s)
+func (t *Tag) SetAlbumSortOrder(s string) {
+	t.SetTextFrame("TSOA", s)
 }
 
-func (f *File) PerformerSortOrder() string {
-	return f.GetTextFrame("TSOP")
+func (t *Tag) PerformerSortOrder() string {
+	return t.GetTextFrame("TSOP")
 }
 
-func (f *File) SetPerformerSortOrder(s string) {
-	f.SetTextFrame("TSOP", s)
+func (t *Tag) SetPerformerSortOrder(s string) {
+	t.SetTextFrame("TSOP", s)
 }
 
-func (f *File) TitleSortOrder() string {
-	return f.GetTextFrame("TSOT")
+func (t *Tag) TitleSortOrder() string {
+	return t.GetTextFrame("TSOT")
 }
 
-func (f *File) SetTitleSortOrder(s string) {
-	f.SetTextFrame("TSOT", s)
+func (t *Tag) SetTitleSortOrder(s string) {
+	t.SetTextFrame("TSOT", s)
 }
 
-func (f *File) ISRC() string {
-	return f.GetTextFrame("TSRC")
+func (t *Tag) ISRC() string {
+	return t.GetTextFrame("TSRC")
 }
 
-func (f *File) SetISRC(isrc string) {
-	f.SetTextFrame("TSRC", isrc)
+func (t *Tag) SetISRC(isrc string) {
+	t.SetTextFrame("TSRC", isrc)
 }
 
-func (f *File) Mood() string {
-	return f.GetTextFrame("TMOO")
+func (t *Tag) Mood() string {
+	return t.GetTextFrame("TMOO")
 }
 
-func (f *File) SetMood(mood string) {
-	f.SetTextFrame("TMOO", mood)
+func (t *Tag) SetMood(mood string) {
+	t.SetTextFrame("TMOO", mood)
 }
 
-func (f *File) Comments() []Comment {
-	frames := f.Frames["COMM"]
+func (t *Tag) Comments() []Comment {
+	frames := t.Frames["COMM"]
 	comments := make([]Comment, len(frames))
 
 	for i, frame := range frames {
@@ -832,7 +848,7 @@ func (f *File) Comments() []Comment {
 	return comments
 }
 
-func (f *File) SetComments(comments []Comment) {
+func (t *Tag) SetComments(comments []Comment) {
 	frames := make([]Frame, len(comments))
 	for i, comment := range comments {
 		frames[i] = CommentFrame{
@@ -844,11 +860,11 @@ func (f *File) SetComments(comments []Comment) {
 			Text:        comment.Text,
 		}
 	}
-	f.Frames["COMM"] = frames
+	t.Frames["COMM"] = frames
 }
 
-func (f *File) HasFrame(name FrameType) bool {
-	_, ok := f.Frames[name]
+func (t *Tag) HasFrame(name FrameType) bool {
+	_, ok := t.Frames[name]
 	return ok
 }
 
@@ -856,14 +872,14 @@ func (f *File) HasFrame(name FrameType) bool {
 //
 // To access user text frames, specify the name like "TXXX:The
 // description".
-func (f *File) GetTextFrame(name FrameType) string {
+func (t *Tag) GetTextFrame(name FrameType) string {
 	userFrameName, ok := frameNameToUserFrame(name)
 	if ok {
-		return f.getUserTextFrame(userFrameName)
+		return t.getUserTextFrame(userFrameName)
 	}
 
 	// Get normal text frame
-	frames := f.Frames[name]
+	frames := t.Frames[name]
 	if len(frames) == 0 {
 		return ""
 	}
@@ -871,8 +887,8 @@ func (f *File) GetTextFrame(name FrameType) string {
 	return frames[0].Value()
 }
 
-func (f *File) getUserTextFrame(name string) string {
-	frames, ok := f.Frames["TXXX"]
+func (t *Tag) getUserTextFrame(name string) string {
+	frames, ok := t.Frames["TXXX"]
 	if !ok {
 		return ""
 	}
@@ -887,8 +903,8 @@ func (f *File) getUserTextFrame(name string) string {
 	return ""
 }
 
-func (f *File) GetTextFrameNumber(name FrameType) int {
-	s := f.GetTextFrame(name)
+func (t *Tag) GetTextFrameNumber(name FrameType) int {
+	s := t.GetTextFrame(name)
 	if s == "" {
 		return 0
 	}
@@ -897,8 +913,8 @@ func (f *File) GetTextFrameNumber(name FrameType) int {
 	return i
 }
 
-func (f *File) GetTextFrameSlice(name FrameType) []string {
-	s := f.GetTextFrame(name)
+func (t *Tag) GetTextFrameSlice(name FrameType) []string {
+	s := t.GetTextFrame(name)
 	if s == "" {
 		return nil
 	}
@@ -906,8 +922,8 @@ func (f *File) GetTextFrameSlice(name FrameType) []string {
 	return strings.Split(s, "\x00")
 }
 
-func (f *File) GetTextFrameTime(name FrameType) time.Time {
-	s := f.GetTextFrame(name)
+func (tag *Tag) GetTextFrameTime(name FrameType) time.Time {
+	s := tag.GetTextFrame(name)
 	if s == "" {
 		return time.Time{}
 	}
@@ -921,17 +937,17 @@ func (f *File) GetTextFrameTime(name FrameType) time.Time {
 	return t
 }
 
-func (f *File) SetTextFrame(name FrameType, value string) {
+func (t *Tag) SetTextFrame(name FrameType, value string) {
 	userFrameName, ok := frameNameToUserFrame(name)
 	if ok {
-		f.setUserTextFrame(userFrameName, value)
+		t.setUserTextFrame(userFrameName, value)
 		return
 	}
 
-	frames, ok := f.Frames[name]
+	frames, ok := t.Frames[name]
 	if !ok {
 		frames = make([]Frame, 1)
-		f.Frames[name] = frames
+		t.Frames[name] = frames
 	}
 	frames[0] = TextInformationFrame{
 		FrameHeader: FrameHeader{
@@ -942,7 +958,7 @@ func (f *File) SetTextFrame(name FrameType, value string) {
 	// TODO what about flags and preserving them?
 }
 
-func (f *File) setUserTextFrame(name string, value string) {
+func (t *Tag) setUserTextFrame(name string, value string) {
 	// Set/create a user text frame
 	frame := UserTextInformationFrame{
 		FrameHeader: FrameHeader{id: "TXXX"},
@@ -950,10 +966,10 @@ func (f *File) setUserTextFrame(name string, value string) {
 		Text:        value,
 	}
 
-	frames, ok := f.Frames["TXXX"]
+	frames, ok := t.Frames["TXXX"]
 	if !ok {
 		frames = make([]Frame, 0)
-		f.Frames["TXXX"] = frames
+		t.Frames["TXXX"] = frames
 	}
 
 	var i int
@@ -967,29 +983,29 @@ func (f *File) setUserTextFrame(name string, value string) {
 	if ok {
 		frames[i] = frame
 	} else {
-		f.Frames["TXXX"] = append(f.Frames["TXXX"], frame)
+		t.Frames["TXXX"] = append(t.Frames["TXXX"], frame)
 	}
 
 }
 
-func (f *File) SetTextFrameNumber(name FrameType, value int) {
-	f.SetTextFrame(name, strconv.Itoa(value))
+func (t *Tag) SetTextFrameNumber(name FrameType, value int) {
+	t.SetTextFrame(name, strconv.Itoa(value))
 }
 
-func (f *File) SetTextFrameSlice(name FrameType, value []string) {
-	f.SetTextFrame(name, strings.Join(value, "\x00"))
+func (t *Tag) SetTextFrameSlice(name FrameType, value []string) {
+	t.SetTextFrame(name, strings.Join(value, "\x00"))
 }
 
-func (f *File) SetTextFrameTime(name FrameType, value time.Time) {
-	f.SetTextFrame(name, value.Format(TimeFormat))
+func (t *Tag) SetTextFrameTime(name FrameType, value time.Time) {
+	t.SetTextFrame(name, value.Format(TimeFormat))
 }
 
 // TODO all the other methods
 
 // UserTextFrames returns all TXXX frames.
-func (f *File) UserTextFrames() []UserTextInformationFrame {
-	res := make([]UserTextInformationFrame, len(f.Frames["TXXX"]))
-	for i, frame := range f.Frames["TXXX"] {
+func (t *Tag) UserTextFrames() []UserTextInformationFrame {
+	res := make([]UserTextInformationFrame, len(t.Frames["TXXX"]))
+	for i, frame := range t.Frames["TXXX"] {
 		res[i] = frame.(UserTextInformationFrame)
 	}
 
@@ -1064,7 +1080,6 @@ func (f *File) saveNew(framesSize int) error {
 		return err
 	}
 
-	f.HasTags = true
 	f.Header.Size = framesSize + Padding
 	f.Header.Version = 0x0400
 	return nil
@@ -1079,7 +1094,7 @@ func (f *File) Save() error {
 	f.SetTextFrameTime("TDTG", time.Now().UTC())
 	framesSize := f.Frames.size()
 
-	if f.HasTags && f.Header.Size >= framesSize && len(f.Frames) > 0 {
+	if f.HasTag() && f.Header.Size >= framesSize && len(f.Frames) > 0 {
 		// The file already has tags and there's enough room to write
 		// ours.
 		Logging.Println("Writing in-place")

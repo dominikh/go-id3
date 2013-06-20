@@ -32,21 +32,11 @@ func (l LogFlag) Println(args ...interface{}) {
 }
 
 const (
-	iso88591 = 0
-	utf16bom = 1
-	utf16be  = 2
-	utf8     = 3
-
 	frameLength   = 10
 	tagHeaderSize = 10
 )
 
 var (
-	utf16nul = []byte{0, 0}
-	nul      = []byte{0}
-
-	utf8byte = []byte{utf8}
-
 	id3byte     = []byte("ID3")
 	versionByte = []byte{4, 0}
 )
@@ -68,7 +58,6 @@ var timeFormats = []string{
 type HeaderFlags byte
 type FrameFlags uint16
 type Version int16
-type Encoding byte
 type FrameType string
 type FramesMap map[FrameType][]Frame
 type PictureType byte
@@ -134,30 +123,6 @@ func (p PictureType) String() string {
 	}
 
 	return PictureTypes[p]
-}
-
-func (e Encoding) String() string {
-	switch e {
-	case iso88591:
-		return "ISO-8859-1"
-	case utf16bom:
-		return "UTF-16"
-	case utf16be:
-		return "UTF-16BE"
-	case utf8:
-		return "UTF-8"
-	default:
-		return fmt.Sprintf("Unknown encoding %d", byte(e))
-	}
-}
-
-func (e Encoding) terminator() []byte {
-	switch e {
-	case utf16bom, utf16be:
-		return utf16nul
-	default:
-		return nul
-	}
 }
 
 // TODO: HeaderFlags.String()
@@ -332,7 +297,7 @@ func readFrame(r io.Reader) (Frame, error) {
 			return nil, err
 		}
 
-		frame.Text = string(reencode(information, encoding))
+		frame.Text = string(encoding.toUTF8(information))
 
 		return frame, nil
 	}
@@ -344,7 +309,7 @@ func readFrame(r io.Reader) (Frame, error) {
 		if err != nil {
 			return nil, err
 		}
-		frame.URL = string(iso88591ToUTF8(url))
+		frame.URL = string(iso88591.toUTF8(url))
 
 		return frame, nil
 	}

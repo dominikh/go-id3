@@ -48,7 +48,7 @@ func TestUTF16ToUTF8(t *testing.T) {
 		103, 44, 138, 158}
 	out := []byte("Just a test: äüö 日本語")
 
-	res := reencode(in, utf16bom)
+	res := utf16bom.toUTF8(in)
 
 	if !bytes.Equal(res, out) {
 		t.Errorf("Expected: %s - Got: %s", out, res)
@@ -62,7 +62,7 @@ func TestUTF16BEToUTF8(t *testing.T) {
 		103, 44, 138, 158}
 	out := []byte("Just a test: äüö 日本語")
 
-	res := reencode(in, utf16be)
+	res := utf16be.toUTF8(in)
 
 	if !bytes.Equal(res, out) {
 		t.Errorf("Expected: %s - Got: %s", out, res)
@@ -76,7 +76,7 @@ func TestUTF16LEToUTF8(t *testing.T) {
 
 	out := []byte("Just a test: äüö 日本語")
 
-	res := reencode(in, utf16bom)
+	res := utf16bom.toUTF8(in)
 
 	if !bytes.Equal(res, out) {
 		t.Errorf("Expected: %s - Got: %s", out, res)

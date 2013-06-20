@@ -1,12 +1,43 @@
 package id3
 
 import (
+	"fmt"
 	utf16pkg "unicode/utf16"
 )
 
-func reencode(b []byte, encoding Encoding) []byte {
+const (
+	iso88591 Encoding = iota
+	utf16bom
+	utf16be
+	utf8
+)
+
+var (
+	utf16nul = []byte{0, 0}
+	nul      = []byte{0}
+	utf8byte = []byte{byte(utf8)}
+)
+
+type Encoding byte
+
+func (e Encoding) String() string {
+	switch e {
+	case iso88591:
+		return "ISO-8859-1"
+	case utf16bom:
+		return "UTF-16"
+	case utf16be:
+		return "UTF-16BE"
+	case utf8:
+		return "UTF-8"
+	default:
+		return fmt.Sprintf("Unknown encoding %d", byte(e))
+	}
+}
+
+func (e Encoding) toUTF8(b []byte) []byte {
 	var ret []byte
-	switch encoding {
+	switch e {
 	case utf16bom, utf16be:
 		ret = utf16ToUTF8(b)
 	case utf8:
@@ -23,6 +54,23 @@ func reencode(b []byte, encoding Encoding) []byte {
 	}
 
 	return ret
+}
+
+func (e Encoding) toISO88591(b []byte) []byte {
+	if e != utf8 {
+		panic("Conversion to ISO-8859-1 is only implemented for UTF-8")
+	}
+
+	return utf8ToISO88591(b)
+}
+
+func (e Encoding) terminator() []byte {
+	switch e {
+	case utf16bom, utf16be:
+		return utf16nul
+	default:
+		return nul
+	}
 }
 
 func utf16ToUTF8(input []byte) []byte {

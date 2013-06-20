@@ -271,12 +271,12 @@ func (f UserTextInformationFrame) Value() string {
 }
 
 func (f UniqueFileIdentifierFrame) size() int {
-	iso := utf8ToISO88591([]byte(f.Owner))
+	iso := utf8.toISO88591([]byte(f.Owner))
 	return frameLength + len(f.Identifier) + len(iso) + 1
 }
 
 func (f UniqueFileIdentifierFrame) WriteTo(w io.Writer) (int64, error) {
-	iso := utf8ToISO88591([]byte(f.Owner))
+	iso := utf8.toISO88591([]byte(f.Owner))
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		iso,
@@ -290,11 +290,11 @@ func (f UniqueFileIdentifierFrame) Value() string {
 }
 
 func (f URLLinkFrame) size() int {
-	return frameLength + len(utf8ToISO88591([]byte(f.URL)))
+	return frameLength + len(utf8.toISO88591([]byte(f.URL)))
 }
 
 func (f URLLinkFrame) WriteTo(w io.Writer) (int64, error) {
-	iso := utf8ToISO88591([]byte(f.URL))
+	iso := utf8.toISO88591([]byte(f.URL))
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		iso,
@@ -306,12 +306,12 @@ func (f URLLinkFrame) Value() string {
 }
 
 func (f UserDefinedURLLinkFrame) size() int {
-	iso := utf8ToISO88591([]byte(f.URL))
+	iso := utf8.toISO88591([]byte(f.URL))
 	return frameLength + len(f.Description) + len(iso) + 2
 }
 
 func (f UserDefinedURLLinkFrame) WriteTo(w io.Writer) (int64, error) {
-	iso := utf8ToISO88591([]byte(f.URL))
+	iso := utf8.toISO88591([]byte(f.URL))
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		utf8byte,
@@ -368,7 +368,7 @@ func (f PictureFrame) Value() string {
 func (f PictureFrame) size() int {
 	return frameLength +
 		1 +
-		len(utf8ToISO88591([]byte(f.MIMEType))) +
+		len(utf8.toISO88591([]byte(f.MIMEType))) +
 		len(nul) +
 		1 +
 		len(f.Description) +
@@ -380,7 +380,7 @@ func (f PictureFrame) WriteTo(w io.Writer) (n int64, err error) {
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		utf8byte,
-		utf8ToISO88591([]byte(f.MIMEType)),
+		utf8.toISO88591([]byte(f.MIMEType)),
 		nul,
 		[]byte{byte(f.PictureType)},
 		[]byte(f.Description),
@@ -450,8 +450,9 @@ func readTXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 		return nil, err
 	}
 	parts := splitNullN(rest, encoding, 2)
-	frame.Description = string(reencode(parts[0], encoding))
-	frame.Text = string(reencode(parts[1], encoding))
+
+	frame.Description = string(encoding.toUTF8(parts[0]))
+	frame.Text = string(encoding.toUTF8(parts[1]))
 
 	return frame, nil
 }
@@ -467,7 +468,7 @@ func readWXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	}
 
 	parts := splitNullN(rest, encoding, 2)
-	frame.Description = string(reencode(parts[0], encoding))
+	frame.Description = string(encoding.toUTF8(parts[0]))
 	frame.URL = string(iso88591ToUTF8(parts[1]))
 
 	return frame, nil
@@ -483,7 +484,7 @@ func readUFIDFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	}
 
 	parts := bytes.SplitN(rest, []byte{0}, 2)
-	frame.Owner = string(reencode(parts[0], iso88591))
+	frame.Owner = string(iso88591.toUTF8(parts[0]))
 	frame.Identifier = parts[1]
 
 	return frame, nil
@@ -506,8 +507,9 @@ func readCOMMFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	parts := splitNullN(rest, encoding, 2)
 
 	frame.Language = string(language[:])
-	frame.Description = string(reencode(parts[0], encoding))
-	frame.Text = string(reencode(parts[1], encoding))
+
+	frame.Description = string(encoding.toUTF8(parts[0]))
+	frame.Text = string(encoding.toUTF8(parts[1]))
 
 	return frame, nil
 }
@@ -542,9 +544,9 @@ func readAPICFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	parts1 := bytes.SplitN(rest, nul, 2)
 	parts2 := splitNullN(parts1[1][1:], encoding, 2)
 
-	frame.MIMEType = string(iso88591ToUTF8(parts1[0]))
+	frame.MIMEType = string(iso88591.toUTF8(parts1[0]))
 	frame.PictureType = PictureType(parts1[1][0])
-	frame.Description = string(reencode(parts2[0], encoding))
+	frame.Description = string(encoding.toUTF8(parts2[0]))
 	frame.Data = parts2[1]
 
 	return frame, nil
@@ -573,8 +575,9 @@ func readUSLTFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 
 	parts := splitNullN(rest, encoding, 2)
 	frame.Language = string(language[:])
-	frame.Description = string(reencode(parts[0], encoding))
-	frame.Lyrics = string(reencode(parts[1], encoding))
+
+	frame.Description = string(encoding.toUTF8(parts[0]))
+	frame.Lyrics = string(encoding.toUTF8(parts[1]))
 
 	return frame, nil
 }

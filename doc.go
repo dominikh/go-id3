@@ -81,7 +81,7 @@ most of the Go standard library, and that the other encodings have no
 realistic benefits over UTF-8.
 
 
-Behaviour when encounterind invalid data
+Behaviour when encountering invalid data
 
 There are two kinds of invalid data that can be encountered: Data that
 doesn't look like a valid frame, and data that is invalid in the

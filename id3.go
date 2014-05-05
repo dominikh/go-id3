@@ -493,7 +493,7 @@ func (t *Tag) upgrade() {
 		}
 	}
 
-	for name, _ := range t.Frames {
+	for name := range t.Frames {
 		switch name {
 		case "TLAN", "TCON", "TPE1", "TOPE", "TCOM", "TEXT", "TOLY":
 			Logging.Println("Replacing / with x00 for", name)
@@ -1063,11 +1063,10 @@ func (f *File) Save() error {
 		// ours.
 		Logging.Println("Writing in-place")
 		return f.saveInplace(framesSize)
-	} else {
-		// We have to create a new file
-		Logging.Println("Writing new file")
-		return f.saveNew(framesSize)
 	}
+	// We have to create a new file
+	Logging.Println("Writing new file")
+	return f.saveNew(framesSize)
 }
 
 func (fm FramesMap) size() int {

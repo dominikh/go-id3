@@ -132,7 +132,7 @@ func iso88591ToUTF8(input []byte) []byte {
 	for _, b := range input {
 		if b <= 128 {
 			res[j] = b
-			j += 1
+			j++
 		} else {
 			if b >= 192 {
 				res[j] = 195

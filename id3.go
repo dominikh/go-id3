@@ -720,16 +720,16 @@ func (t *Tag) RecordingTime() time.Time {
 	return t.GetTextFrameTime("TDRC")
 }
 
-func (tag *Tag) SetRecordingTime(t time.Time) {
-	tag.SetTextFrameTime("TDRC", t)
+func (t *Tag) SetRecordingTime(rt time.Time) {
+	t.SetTextFrameTime("TDRC", rt)
 }
 
 func (t *Tag) OriginalReleaseTime() time.Time {
 	return t.GetTextFrameTime("TDOR")
 }
 
-func (tag *Tag) SetOriginalReleaseTime(t time.Time) {
-	tag.SetTextFrameTime("TDOR", t)
+func (t *Tag) SetOriginalReleaseTime(rt time.Time) {
+	t.SetTextFrameTime("TDOR", rt)
 }
 
 func (t *Tag) OriginalFilename() string {
@@ -752,8 +752,8 @@ func (t *Tag) EncodingTime() time.Time {
 	return t.GetTextFrameTime("TDEN")
 }
 
-func (tag *Tag) SetEncodingTime(t time.Time) {
-	tag.SetTextFrameTime("TDEN", t)
+func (t *Tag) SetEncodingTime(et time.Time) {
+	t.SetTextFrameTime("TDEN", et)
 }
 
 func (t *Tag) AlbumSortOrder() string {
@@ -886,19 +886,19 @@ func (t *Tag) GetTextFrameSlice(name FrameType) []string {
 	return strings.Split(s, "\x00")
 }
 
-func (tag *Tag) GetTextFrameTime(name FrameType) time.Time {
-	s := tag.GetTextFrame(name)
+func (t *Tag) GetTextFrameTime(name FrameType) time.Time {
+	s := t.GetTextFrame(name)
 	if s == "" {
 		return time.Time{}
 	}
 
-	t, err := parseTime(s)
+	ft, err := parseTime(s)
 	if err != nil {
 		// FIXME figure out a way to signal format errors
 		panic(err)
 	}
 
-	return t
+	return ft
 }
 
 func (t *Tag) SetTextFrame(name FrameType, value string) {

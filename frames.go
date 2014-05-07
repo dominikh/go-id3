@@ -139,8 +139,8 @@ type FrameHeader struct {
 type Frame interface {
 	ID() FrameType
 	Value() string
-	io.WriterTo
-	size() int
+	Encode(w io.Writer) error
+	size() int // TODO export?
 }
 
 type TextInformationFrame struct {
@@ -234,11 +234,11 @@ func (f TextInformationFrame) size() int {
 	return frameLength + len(f.Text) + 1
 }
 
-func (f TextInformationFrame) WriteTo(w io.Writer) (int64, error) {
+func (f TextInformationFrame) Encode(w io.Writer) error {
 	switch f.FrameHeader.ID() {
 	case "TRDA", "TSIZ":
 		Logging.Println("Not writing header", f.FrameHeader.ID())
-		return 0, nil
+		return nil
 	default:
 		return writeMany(w,
 			f.FrameHeader.serialize(f.size()-frameLength),
@@ -256,7 +256,7 @@ func (f UserTextInformationFrame) size() int {
 	return frameLength + len(f.Description) + len(f.Text) + 2
 }
 
-func (f UserTextInformationFrame) WriteTo(w io.Writer) (int64, error) {
+func (f UserTextInformationFrame) Encode(w io.Writer) error {
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		utf8byte,
@@ -275,7 +275,7 @@ func (f UniqueFileIdentifierFrame) size() int {
 	return frameLength + len(f.Identifier) + len(iso) + 1
 }
 
-func (f UniqueFileIdentifierFrame) WriteTo(w io.Writer) (int64, error) {
+func (f UniqueFileIdentifierFrame) Encode(w io.Writer) error {
 	iso := utf8.toISO88591([]byte(f.Owner))
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
@@ -293,7 +293,7 @@ func (f URLLinkFrame) size() int {
 	return frameLength + len(utf8.toISO88591([]byte(f.URL)))
 }
 
-func (f URLLinkFrame) WriteTo(w io.Writer) (int64, error) {
+func (f URLLinkFrame) Encode(w io.Writer) error {
 	iso := utf8.toISO88591([]byte(f.URL))
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
@@ -310,7 +310,7 @@ func (f UserDefinedURLLinkFrame) size() int {
 	return frameLength + len(f.Description) + len(iso) + 2
 }
 
-func (f UserDefinedURLLinkFrame) WriteTo(w io.Writer) (int64, error) {
+func (f UserDefinedURLLinkFrame) Encode(w io.Writer) error {
 	iso := utf8.toISO88591([]byte(f.URL))
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
@@ -329,7 +329,7 @@ func (f CommentFrame) size() int {
 	return frameLength + len(f.Description) + len(f.Text) + 5
 }
 
-func (f CommentFrame) WriteTo(w io.Writer) (int64, error) {
+func (f CommentFrame) Encode(w io.Writer) error {
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		utf8byte,
@@ -352,7 +352,7 @@ func (f PrivateFrame) size() int {
 	return frameLength + len(f.Owner) + len(f.Data) + len(nul)
 }
 
-func (f PrivateFrame) WriteTo(w io.Writer) (n int64, err error) {
+func (f PrivateFrame) Encode(w io.Writer) error {
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		f.Owner,
@@ -376,7 +376,7 @@ func (f PictureFrame) size() int {
 		len(f.Data)
 }
 
-func (f PictureFrame) WriteTo(w io.Writer) (n int64, err error) {
+func (f PictureFrame) Encode(w io.Writer) error {
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		utf8byte,
@@ -397,7 +397,7 @@ func (f MusicCDIdentifierFrame) size() int {
 	return frameLength + len(f.TOC)
 }
 
-func (f MusicCDIdentifierFrame) WriteTo(w io.Writer) (n int64, err error) {
+func (f MusicCDIdentifierFrame) Encode(w io.Writer) error {
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		f.TOC,
@@ -412,7 +412,7 @@ func (f UnsynchronisedLyricsFrame) size() int {
 	return frameLength + 5 + len(f.Description) + len(f.Lyrics)
 }
 
-func (f UnsynchronisedLyricsFrame) WriteTo(w io.Writer) (n int64, err error) {
+func (f UnsynchronisedLyricsFrame) Encode(w io.Writer) error {
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),
 		utf8byte,
@@ -427,7 +427,7 @@ func (f UnsupportedFrame) size() int {
 	return frameLength + len(f.Data)
 }
 
-func (f UnsupportedFrame) WriteTo(w io.Writer) (int64, error) {
+func (f UnsupportedFrame) Encode(w io.Writer) error {
 	// TODO check header if unsupported frame should be dropped or copied verbatim
 	return writeMany(w,
 		f.FrameHeader.serialize(f.size()-frameLength),

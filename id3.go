@@ -991,7 +991,7 @@ func (f *File) saveInplace(framesSize int) error {
 		return err
 	}
 
-	_, err = f.Frames.WriteTo(f.f)
+	err = f.Frames.Encode(f.f)
 	if err != nil {
 		return err
 	}
@@ -1020,7 +1020,7 @@ func (f *File) saveNew(framesSize int) error {
 		buf = newFile
 	}
 
-	_, err := f.WriteTo(buf)
+	err := f.SaveTo(buf)
 	if err != nil {
 		return err
 	}
@@ -1080,14 +1080,13 @@ func (fm FramesMap) size() int {
 	return size
 }
 
-func (fm FramesMap) WriteTo(w io.Writer) (n int64, err error) {
+func (fm FramesMap) Encode(w io.Writer) (err error) {
 	// TODO write important frames first
 	for _, frames := range fm {
 		for _, frame := range frames {
-			nw, err := frame.WriteTo(w)
-			n += nw
+			err := frame.Encode(w)
 			if err != nil {
-				return n, err
+				return err
 			}
 		}
 	}
@@ -1095,53 +1094,50 @@ func (fm FramesMap) WriteTo(w io.Writer) (n int64, err error) {
 	return
 }
 
-func (f *File) WriteTo(w io.Writer) (int64, error) {
-	var n int64
+func (f *File) SaveTo(w io.Writer) error {
+	// TODO document that this will not update version/HasTag/... for
+	// this *File
+	if len(f.Frames) == 0 {
+		_, err := io.Copy(w, f.audioReader)
+		return err
+	}
 
-	if len(f.Frames) > 0 {
-		f.SetTextFrameTime("TDTG", time.Now().UTC())
-		header := generateHeader(f.Frames.size() + Padding)
-		n1, err := w.Write(header)
-		n += int64(n1)
-		if err != nil {
-			return n, err
-		}
+	f.SetTextFrameTime("TDTG", time.Now().UTC())
+	header := generateHeader(f.Frames.size() + Padding)
+	_, err := w.Write(header)
+	if err != nil {
+		return err
+	}
 
-		n2, err := f.Frames.WriteTo(w)
-		n += int64(n2)
-		if err != nil {
-			return n, err
-		}
+	err = f.Frames.Encode(w)
+	if err != nil {
+		return err
+	}
 
-		n1, err = w.Write(make([]byte, Padding))
-		n += int64(n1)
-		if err != nil {
-			return n, err
-		}
+	_, err = w.Write(make([]byte, Padding))
+	if err != nil {
+		return err
+	}
 
-		_, err = f.audioReader.Seek(0, 0)
-		if err != nil {
-			return n, err
-		}
+	_, err = f.audioReader.Seek(0, 0)
+	if err != nil {
+		return err
 	}
 
 	// Copy audio data
-	n2, err := io.Copy(w, f.audioReader)
-	n += int64(n2)
-	return n, err
+	_, err = io.Copy(w, f.audioReader)
+	return err
 }
 
-func writeMany(w io.Writer, data ...[]byte) (int64, error) {
-	n := 0
+func writeMany(w io.Writer, data ...[]byte) error {
 	for _, data := range data {
-		m, err := w.Write(data)
-		n += m
+		_, err := w.Write(data)
 		if err != nil {
-			return int64(n), err
+			return err
 		}
 	}
 
-	return int64(n), nil
+	return nil
 }
 
 func desynchsafeInt(b [4]byte) int {

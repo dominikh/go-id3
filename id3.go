@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+// TODO reevaluate TagHeader. Right now it's a snapshot of the past
+// that doesn't reflect the present
+
 // The amount of padding that will be added after the last frame.
 var Padding = 1024
 
@@ -21,7 +24,7 @@ var Logging LogFlag
 
 // The size limit in bytes for in-memory buffers when rewriting files before
 // falling back to temporary files.
-var InMemoryThreshold = int64(1024 * 1024 * 10)
+var InMemoryThreshold = int64(1024 * 1024 * 10) // 10 MB
 
 type LogFlag bool
 
@@ -70,6 +73,7 @@ type NotAFrameHeader struct {
 	}
 }
 
+// TODO export this error?
 type notATagHeader struct {
 	Magic [3]byte
 }
@@ -383,6 +387,8 @@ func NewFile(file *os.File, tag *Tag) (*File, error) {
 //
 // Call Close() to close the underlying *os.File when done.
 func Open(name string) (*File, error) {
+	// TODO improve documentation. HasTag() will only be false until
+	// the first save; and there will be an empty tag to work with.
 	f, err := os.OpenFile(name, os.O_RDWR, 0)
 	if err != nil {
 		return nil, err
@@ -430,6 +436,8 @@ func ParseHeader(r io.Reader) (TagHeader, error) {
 // Parse will always return a valid tag. In the case of an error, the
 // tag will be empty.
 func Parse(r io.Reader) (*Tag, error) {
+	// TODO return how many bytes we read into the reader; so people
+	// know where the audio begins
 	tag := NewTag()
 	header, err := ParseHeader(r)
 	if err != nil {

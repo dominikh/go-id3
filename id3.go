@@ -108,6 +108,23 @@ func NewTag() *Tag {
 	return &Tag{Frames: make(FramesMap)}
 }
 
+func (t *Tag) Encode(w io.Writer) error {
+	t.SetTextFrameTime("TDTG", time.Now().UTC())
+	header := generateHeader(t.Frames.size() + Padding)
+	_, err := w.Write(header)
+	if err != nil {
+		return err
+	}
+
+	err = t.Frames.Encode(w)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(make([]byte, Padding))
+	return err
+}
+
 func (f FrameType) String() string {
 	v, ok := FrameNames[f]
 	if ok {
@@ -1097,24 +1114,7 @@ func (fm FramesMap) Encode(w io.Writer) (err error) {
 func (f *File) SaveTo(w io.Writer) error {
 	// TODO document that this will not update version/HasTag/... for
 	// this *File
-	if len(f.Frames) == 0 {
-		_, err := io.Copy(w, f.audioReader)
-		return err
-	}
-
-	f.SetTextFrameTime("TDTG", time.Now().UTC())
-	header := generateHeader(f.Frames.size() + Padding)
-	_, err := w.Write(header)
-	if err != nil {
-		return err
-	}
-
-	err = f.Frames.Encode(w)
-	if err != nil {
-		return err
-	}
-
-	_, err = w.Write(make([]byte, Padding))
+	err := f.Tag.Encode(w)
 	if err != nil {
 		return err
 	}

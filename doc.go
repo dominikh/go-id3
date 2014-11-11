@@ -110,4 +110,4 @@ modify the content. All unsupported frames will be of type
 UnsupportedFrame.
 
 */
-package id3
+package id3 // import "honnef.co/go/id3"

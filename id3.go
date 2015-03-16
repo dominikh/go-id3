@@ -937,18 +937,19 @@ func truncate(f *os.File) error {
 }
 
 func generateHeader(size int) []byte {
-	buf := new(bytes.Buffer)
-
 	size = synchsafeInt(size)
 
-	writeMany(buf,
-		id3byte,
-		versionByte,
-		nul, // TODO flags
-		intToBytes(size),
-	)
+	b1 := id3byte
+	b2 := versionByte
+	b3 := nul // TODO flags
+	b4 := intToBytes(size)
+	var b5 []byte
+	b5 = append(b5, b1...)
+	b5 = append(b5, b2...)
+	b5 = append(b5, b3...)
+	b5 = append(b5, b4...)
 
-	return buf.Bytes()
+	return b5
 }
 
 func frameNameToUserFrame(name FrameType) (frameName string, ok bool) {

@@ -1,5 +1,5 @@
 /*
-Foo bar.
+Package id3 implements a decoder and encoder for ID3 tags.
 
 Nomenclature
 

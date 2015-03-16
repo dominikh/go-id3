@@ -135,8 +135,11 @@ type FrameHeader struct {
 	flags FrameFlags
 }
 
+func (h FrameHeader) Header() FrameHeader { return h }
+
 type Frame interface {
 	ID() FrameType
+	Header() FrameHeader
 	Value() string
 	Encode() []byte
 	size() int // TODO export?
@@ -239,11 +242,9 @@ func (f TextInformationFrame) Encode() []byte {
 		Logging.Println("Not writing header", f.FrameHeader.ID())
 		return nil
 	default:
-		b1 := f.FrameHeader.serialize(f.size() - frameLength)
 		b2 := utf8byte
 		b3 := []byte(f.Text)
 		var b4 []byte
-		b4 = append(b4, b1...)
 		b4 = append(b4, b2...)
 		b4 = append(b4, b3...)
 		return b4
@@ -259,13 +260,11 @@ func (f UserTextInformationFrame) size() int {
 }
 
 func (f UserTextInformationFrame) Encode() []byte {
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := utf8byte
 	b3 := []byte(f.Description)
 	b4 := nul
 	b5 := []byte(f.Text)
 	var b6 []byte
-	b6 = append(b6, b1...)
 	b6 = append(b6, b2...)
 	b6 = append(b6, b3...)
 	b6 = append(b6, b4...)
@@ -284,12 +283,10 @@ func (f UniqueFileIdentifierFrame) size() int {
 
 func (f UniqueFileIdentifierFrame) Encode() []byte {
 	iso := utf8.toISO88591([]byte(f.Owner))
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := iso
 	b3 := nul
 	b4 := f.Identifier
 	var b5 []byte
-	b5 = append(b5, b1...)
 	b5 = append(b5, b2...)
 	b5 = append(b5, b3...)
 	b5 = append(b5, b4...)
@@ -306,10 +303,8 @@ func (f URLLinkFrame) size() int {
 
 func (f URLLinkFrame) Encode() []byte {
 	iso := utf8.toISO88591([]byte(f.URL))
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := iso
 	var b3 []byte
-	b3 = append(b3, b1...)
 	b3 = append(b3, b2...)
 	return b3
 }
@@ -325,13 +320,11 @@ func (f UserDefinedURLLinkFrame) size() int {
 
 func (f UserDefinedURLLinkFrame) Encode() []byte {
 	iso := utf8.toISO88591([]byte(f.URL))
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := utf8byte
 	b3 := []byte(f.Description)
 	b4 := nul
 	b5 := iso
 	var b6 []byte
-	b6 = append(b6, b1...)
 	b6 = append(b6, b2...)
 	b6 = append(b6, b3...)
 	b6 = append(b6, b4...)
@@ -348,14 +341,12 @@ func (f CommentFrame) size() int {
 }
 
 func (f CommentFrame) Encode() []byte {
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := utf8byte
 	b3 := []byte(f.Language)
 	b4 := []byte(f.Description)
 	b5 := nul
 	b6 := []byte(f.Text)
 	var b7 []byte
-	b7 = append(b7, b1...)
 	b7 = append(b7, b2...)
 	b7 = append(b7, b3...)
 	b7 = append(b7, b4...)
@@ -377,12 +368,10 @@ func (f PrivateFrame) size() int {
 }
 
 func (f PrivateFrame) Encode() []byte {
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := f.Owner
 	b3 := nul
 	b4 := f.Data
 	var b5 []byte
-	b5 = append(b5, b1...)
 	b5 = append(b5, b2...)
 	b5 = append(b5, b3...)
 	b5 = append(b5, b4...)
@@ -405,7 +394,6 @@ func (f PictureFrame) size() int {
 }
 
 func (f PictureFrame) Encode() []byte {
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := utf8byte
 	b3 := utf8.toISO88591([]byte(f.MIMEType))
 	b4 := nul
@@ -414,7 +402,6 @@ func (f PictureFrame) Encode() []byte {
 	b7 := nul
 	b8 := f.Data
 	var b9 []byte
-	b9 = append(b9, b1...)
 	b9 = append(b9, b2...)
 	b9 = append(b9, b3...)
 	b9 = append(b9, b4...)
@@ -434,10 +421,8 @@ func (f MusicCDIdentifierFrame) size() int {
 }
 
 func (f MusicCDIdentifierFrame) Encode() []byte {
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := f.TOC
 	var b3 []byte
-	b3 = append(b3, b1...)
 	b3 = append(b3, b2...)
 	return b3
 }
@@ -451,14 +436,12 @@ func (f UnsynchronisedLyricsFrame) size() int {
 }
 
 func (f UnsynchronisedLyricsFrame) Encode() []byte {
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := utf8byte
 	b3 := []byte(f.Language)
 	b4 := []byte(f.Description)
 	b5 := nul
 	b6 := []byte(f.Lyrics)
 	var b7 []byte
-	b7 = append(b7, b1...)
 	b7 = append(b7, b2...)
 	b7 = append(b7, b3...)
 	b7 = append(b7, b4...)
@@ -473,10 +456,8 @@ func (f UnsupportedFrame) size() int {
 
 func (f UnsupportedFrame) Encode() []byte {
 	// TODO check header if unsupported frame should be dropped or copied verbatim
-	b1 := f.FrameHeader.serialize(f.size() - frameLength)
 	b2 := f.Data
 	var b3 []byte
-	b3 = append(b3, b1...)
 	b3 = append(b3, b2...)
 	return b3
 }

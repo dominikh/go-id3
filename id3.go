@@ -126,6 +126,11 @@ func NewEncoder(w io.Writer) *Encoder {
 }
 
 func (e *Encoder) WriteFrame(f Frame) error {
+	b := f.Header().serialize(f.size() - frameLength)
+	_, err := e.w.Write(b)
+	if err != nil {
+		return err
+	}
 	b = f.Encode()
 	_, err = e.w.Write(b)
 	return err

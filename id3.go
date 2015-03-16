@@ -252,11 +252,8 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 	return header, nil
 }
 
-// readFrame reads the next ID3 frame. It expects the reader to be
-// seeked to right before the frame. It also expects that the reader
-// can't read beyond the last frame. readFrame will return io.EOF if
-// there are no more frames to read.
-func (d *Decoder) readFrame() (Frame, error) {
+// ParseFrame reads the next ID3 frame.
+func (d *Decoder) ParseFrame() (Frame, error) {
 	var (
 		headerBytes struct {
 			ID    [4]byte
@@ -436,17 +433,13 @@ func NewDecoder(r io.Reader) *Decoder {
 
 // ParseHeader parses only the ID3 header.
 func (d *Decoder) ParseHeader() (TagHeader, error) {
-	// TODO after using ParseHeader, it's impossible to read the rest
-	// of the tag unless the reader can be seeked back to the
-	// beginning. Should we a) provide a way to read a tag based off
-	// an existing header b) not export ParseHeader c) just document
-	// this fact?
 	header, err := d.readHeader()
-	// f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
-	// f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
 	if err != nil {
 		return TagHeader{}, err
 	}
+
+	d.h = header
+	d.r = io.LimitReader(d.r, int64(header.Size)+tagHeaderSize)
 
 	return header, nil
 }
@@ -474,9 +467,8 @@ func (d *Decoder) Parse() (*Tag, error) {
 		panic("not implemented: cannot parse unsynchronised tag")
 	}
 
-	d.r = io.LimitReader(d.r, int64(header.Size)+tagHeaderSize)
 	for {
-		frame, err := d.readFrame()
+		frame, err := d.ParseFrame()
 		if err != nil {
 			if err == io.EOF {
 				break

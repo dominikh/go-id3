@@ -51,6 +51,11 @@ func (e *Encoder) WriteFrame(f Frame) error {
 	return err
 }
 
+func (e *Encoder) WritePadding() error {
+	_, err := e.w.Write(make([]byte, e.Padding))
+	return err
+}
+
 func (t *Tag) Encode(w io.Writer) error {
 	t.SetTextFrameTime("TDTG", time.Now().UTC())
 	enc := NewEncoder(w)
@@ -69,6 +74,5 @@ func (t *Tag) Encode(w io.Writer) error {
 		}
 	}
 
-	_, err = w.Write(make([]byte, enc.Padding))
-	return err
+	return enc.WritePadding()
 }

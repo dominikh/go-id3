@@ -19,12 +19,17 @@ import (
 // The amount of padding that will be added after the last frame.
 var Padding = 1024
 
+// TODO make padding configurable per tag?
+
 // Enables logging if set to true.
 var Logging LogFlag
 
-// The size limit in bytes for in-memory buffers when rewriting files before
-// falling back to temporary files.
+// The size limit in bytes for in-memory buffers when rewriting files
+// before falling back to temporary files. A negative value will
+// always use an in-memory buffer.
 var InMemoryThreshold = int64(1024 * 1024 * 10) // 10 MB
+
+// TODO make this configurable per file?
 
 type LogFlag bool
 
@@ -421,6 +426,11 @@ func (f *File) Close() error {
 
 // ParseHeader parses only the ID3 header.
 func ParseHeader(r io.Reader) (TagHeader, error) {
+	// TODO after using ParseHeader, it's impossible to read the rest
+	// of the tag unless the reader can be seeked back to the
+	// beginning. Should we a) provide a way to read a tag based off
+	// an existing header b) not export ParseHeader c) just document
+	// this fact?
 	header, err := readHeader(r)
 	// f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
 	// f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
@@ -1036,6 +1046,9 @@ func (f *File) saveNew(framesSize int) error {
 		Logging.Println("Working in memory")
 		buf = new(bytes.Buffer)
 	} else {
+		// FIXME create temporary file in same directory as the
+		// original file, then rename(), instead of copying, to avoid
+		// losing files in case of a crash
 		Logging.Println("Using a temporary file")
 		newFile, err := ioutil.TempFile("", "id3")
 		if err != nil {
@@ -1074,12 +1087,18 @@ func (f *File) saveNew(framesSize int) error {
 	return nil
 }
 
-// Save saves the tags to the file. If the changed tags fit into the
-// existing file, they will be overwritten in place. Otherwise the
-// entire file will be rewritten.
+// Save saves the tag to the file. If the changed tag fits into the
+// existing file, it will be overwritten in place. Otherwise the
+// entire file will be rewritten
 //
 // If you require backups, you need to create them yourself.
 func (f *File) Save() error {
+	// TODO document the exact overwrite behaviour
+	//
+	// , either by constructing a new file in memory (see the variable
+	// InMemoryThreshold) or by writing to a temporary file, which
+	// will then get copied over
+
 	f.SetTextFrameTime("TDTG", time.Now().UTC())
 	framesSize := f.Frames.size()
 

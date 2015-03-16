@@ -5,6 +5,22 @@ import (
 	"time"
 )
 
+func generateHeader(size int) []byte {
+	size = synchsafeInt(size)
+
+	b1 := id3byte
+	b2 := versionByte
+	b3 := nul // TODO flags
+	b4 := intToBytes(size)
+	var b5 []byte
+	b5 = append(b5, b1...)
+	b5 = append(b5, b2...)
+	b5 = append(b5, b3...)
+	b5 = append(b5, b4...)
+
+	return b5
+}
+
 type Encoder struct {
 	w io.Writer
 }

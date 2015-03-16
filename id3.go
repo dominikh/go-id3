@@ -936,22 +936,6 @@ func truncate(f *os.File) error {
 	return err
 }
 
-func generateHeader(size int) []byte {
-	size = synchsafeInt(size)
-
-	b1 := id3byte
-	b2 := versionByte
-	b3 := nul // TODO flags
-	b4 := intToBytes(size)
-	var b5 []byte
-	b5 = append(b5, b1...)
-	b5 = append(b5, b2...)
-	b5 = append(b5, b3...)
-	b5 = append(b5, b4...)
-
-	return b5
-}
-
 func frameNameToUserFrame(name FrameType) (frameName string, ok bool) {
 	if len(name) < 6 {
 		return "", false

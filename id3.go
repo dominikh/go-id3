@@ -117,6 +117,18 @@ func NewTag() *Tag {
 	return &Tag{Frames: make(FramesMap)}
 }
 
+type Encoder struct {
+	w io.Writer
+}
+
+func NewEncoder(w io.Writer) *Encoder {
+	return &Encoder{w: w}
+}
+
+func (e *Encoder) WriteFrame(f Frame) error {
+	return f.Encode(e.w)
+}
+
 func (t *Tag) Encode(w io.Writer) error {
 	t.SetTextFrameTime("TDTG", time.Now().UTC())
 	header := generateHeader(t.Frames.size() + Padding)
@@ -125,9 +137,14 @@ func (t *Tag) Encode(w io.Writer) error {
 		return err
 	}
 
-	err = t.Frames.Encode(w)
-	if err != nil {
-		return err
+	// TODO write important frames first
+	for _, frames := range t.Frames {
+		for _, frame := range frames {
+			err := frame.Encode(w)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	_, err = w.Write(make([]byte, Padding))
@@ -1013,31 +1030,31 @@ func (t *Tag) UserTextFrames() []UserTextInformationFrame {
 	return res
 }
 
-func (f *File) saveInplace(framesSize int) error {
-	// TODO consider writing headers/frames into buffer first, to
-	// not break existing file in case of error
-	header := generateHeader(f.Header.Size)
+// func (f *File) saveInplace(framesSize int) error {
+// 	// TODO consider writing headers/frames into buffer first, to
+// 	// not break existing file in case of error
+// 	header := generateHeader(f.Header.Size)
 
-	_, err := f.f.Seek(0, 0)
-	if err != nil {
-		return err
-	}
+// 	_, err := f.f.Seek(0, 0)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	_, err = f.f.Write(header)
-	if err != nil {
-		return err
-	}
+// 	_, err = f.f.Write(header)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	err = f.Frames.Encode(f.f)
-	if err != nil {
-		return err
-	}
+// 	err = f.Frames.Encode(f.f)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	f.Header.Version = 0x0400
-	// Blank out remainder of previous tags
-	_, err = f.f.Write(make([]byte, f.Header.Size-framesSize))
-	return err
-}
+// 	f.Header.Version = 0x0400
+// 	// Blank out remainder of previous tags
+// 	_, err = f.f.Write(make([]byte, f.Header.Size-framesSize))
+// 	return err
+// }
 
 func (f *File) saveNew(framesSize int) error {
 	var buf io.ReadWriter
@@ -1104,12 +1121,12 @@ func (f *File) Save() error {
 	f.SetTextFrameTime("TDTG", time.Now().UTC())
 	framesSize := f.Frames.size()
 
-	if f.HasTag() && f.Header.Size >= framesSize && len(f.Frames) > 0 {
-		// The file already has tags and there's enough room to write
-		// ours.
-		Logging.Println("Writing in-place")
-		return f.saveInplace(framesSize)
-	}
+	// if f.HasTag() && f.Header.Size >= framesSize && len(f.Frames) > 0 {
+	// 	// The file already has tags and there's enough room to write
+	// 	// ours.
+	// 	Logging.Println("Writing in-place")
+	// 	return f.saveInplace(framesSize)
+	// }
 	// We have to create a new file
 	Logging.Println("Writing new file")
 	return f.saveNew(framesSize)
@@ -1124,20 +1141,6 @@ func (fm FramesMap) size() int {
 	}
 
 	return size
-}
-
-func (fm FramesMap) Encode(w io.Writer) (err error) {
-	// TODO write important frames first
-	for _, frames := range fm {
-		for _, frame := range frames {
-			err := frame.Encode(w)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return
 }
 
 func (f *File) SaveTo(w io.Writer) error {

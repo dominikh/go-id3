@@ -440,12 +440,12 @@ func (UnsupportedFrame) Value() string {
 	return ""
 }
 
-func readTXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+func (d *Decoder) readTXXXFrame(header FrameHeader, frameSize int) (Frame, error) {
 	var encoding Encoding
 	frame := UserTextInformationFrame{FrameHeader: header}
 	rest := make([]byte, frameSize-1)
 
-	err := readBinary(r, &encoding, &rest)
+	err := readBinary(d.r, &encoding, &rest)
 	if err != nil {
 		return nil, err
 	}
@@ -457,12 +457,12 @@ func readTXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func readWXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+func (d *Decoder) readWXXXFrame(header FrameHeader, frameSize int) (Frame, error) {
 	var encoding Encoding
 	frame := UserDefinedURLLinkFrame{FrameHeader: header}
 	rest := make([]byte, frameSize-1)
 
-	err := readBinary(r, &encoding, &rest)
+	err := readBinary(d.r, &encoding, &rest)
 	if err != nil {
 		return nil, err
 	}
@@ -474,11 +474,11 @@ func readWXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func readUFIDFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+func (d *Decoder) readUFIDFrame(header FrameHeader, frameSize int) (Frame, error) {
 	frame := UniqueFileIdentifierFrame{FrameHeader: header}
 	rest := make([]byte, frameSize)
 
-	err := binary.Read(r, binary.BigEndian, rest)
+	err := binary.Read(d.r, binary.BigEndian, rest)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +490,7 @@ func readUFIDFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func readCOMMFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+func (d *Decoder) readCOMMFrame(header FrameHeader, frameSize int) (Frame, error) {
 	frame := CommentFrame{FrameHeader: header}
 	var (
 		encoding Encoding
@@ -499,7 +499,7 @@ func readCOMMFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	)
 	rest = make([]byte, frameSize-4)
 
-	err := readBinary(r, &encoding, &language, &rest)
+	err := readBinary(d.r, &encoding, &language, &rest)
 	if err != nil {
 		return nil, err
 	}
@@ -514,10 +514,10 @@ func readCOMMFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func readPRIVFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+func (d *Decoder) readPRIVFrame(header FrameHeader, frameSize int) (Frame, error) {
 	frame := PrivateFrame{FrameHeader: header}
 	data := make([]byte, frameSize)
-	_, err := r.Read(data)
+	_, err := d.r.Read(data)
 	if err != nil {
 		return frame, err
 	}
@@ -529,14 +529,14 @@ func readPRIVFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func readAPICFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+func (d *Decoder) readAPICFrame(header FrameHeader, frameSize int) (Frame, error) {
 	frame := PictureFrame{FrameHeader: header}
 	var (
 		encoding Encoding
 		rest     []byte
 	)
 	rest = make([]byte, frameSize-1)
-	err := readBinary(r, &encoding, &rest)
+	err := readBinary(d.r, &encoding, &rest)
 	if err != nil {
 		return frame, err
 	}
@@ -552,14 +552,14 @@ func readAPICFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func readMCDIFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+func (d *Decoder) readMCDIFrame(header FrameHeader, frameSize int) (Frame, error) {
 	frame := MusicCDIdentifierFrame{FrameHeader: header}
 	frame.TOC = make([]byte, frameSize)
-	_, err := r.Read(frame.TOC)
+	_, err := d.r.Read(frame.TOC)
 	return frame, err
 }
 
-func readUSLTFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
+func (d *Decoder) readUSLTFrame(header FrameHeader, frameSize int) (Frame, error) {
 	frame := UnsynchronisedLyricsFrame{FrameHeader: header}
 	var (
 		encoding Encoding
@@ -568,7 +568,7 @@ func readUSLTFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	)
 	rest = make([]byte, frameSize-4)
 
-	err := readBinary(r, &encoding, &language, rest)
+	err := readBinary(d.r, &encoding, &language, rest)
 	if err != nil {
 		return frame, err
 	}

@@ -223,7 +223,7 @@ func readBinary(r io.Reader, args ...interface{}) (err error) {
 
 // readHeader reads an ID3v2 header. It expects the reader to be
 // seeked to the beginning of the header.
-func readHeader(r io.Reader) (header TagHeader, err error) {
+func (d *Decoder) readHeader() (header TagHeader, err error) {
 	var (
 		bytes struct {
 			Magic   [3]byte
@@ -233,7 +233,7 @@ func readHeader(r io.Reader) (header TagHeader, err error) {
 		}
 	)
 
-	err = binary.Read(r, binary.BigEndian, &bytes)
+	err = binary.Read(d.r, binary.BigEndian, &bytes)
 	if err != nil {
 		return header, err
 	}
@@ -256,7 +256,7 @@ func readHeader(r io.Reader) (header TagHeader, err error) {
 // seeked to right before the frame. It also expects that the reader
 // can't read beyond the last frame. readFrame will return io.EOF if
 // there are no more frames to read.
-func readFrame(r io.Reader) (Frame, error) {
+func (d *Decoder) readFrame() (Frame, error) {
 	var (
 		headerBytes struct {
 			ID    [4]byte
@@ -266,7 +266,7 @@ func readFrame(r io.Reader) (Frame, error) {
 		header FrameHeader
 	)
 
-	err := binary.Read(r, binary.BigEndian, &headerBytes)
+	err := binary.Read(d.r, binary.BigEndian, &headerBytes)
 	if err != nil {
 		if err == io.ErrUnexpectedEOF {
 			// If we couldn't read the header assume we were at the
@@ -318,7 +318,7 @@ func readFrame(r io.Reader) (Frame, error) {
 		var encoding Encoding
 		frame := TextInformationFrame{FrameHeader: header}
 		information := make([]byte, frameSize-1)
-		err := readBinary(r, &encoding, &information)
+		err := readBinary(d.r, &encoding, &information)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +331,7 @@ func readFrame(r io.Reader) (Frame, error) {
 	if header.id[0] == 'W' && header.id != "WXXX" {
 		frame := URLLinkFrame{FrameHeader: header}
 		url := make([]byte, frameSize)
-		_, err = r.Read(url)
+		_, err = d.r.Read(url)
 		if err != nil {
 			return nil, err
 		}
@@ -342,24 +342,24 @@ func readFrame(r io.Reader) (Frame, error) {
 
 	switch header.id {
 	case "TXXX":
-		return readTXXXFrame(r, header, frameSize)
+		return d.readTXXXFrame(header, frameSize)
 	case "WXXX":
-		return readWXXXFrame(r, header, frameSize)
+		return d.readWXXXFrame(header, frameSize)
 	case "UFID":
-		return readUFIDFrame(r, header, frameSize)
+		return d.readUFIDFrame(header, frameSize)
 	case "COMM":
-		return readCOMMFrame(r, header, frameSize)
+		return d.readCOMMFrame(header, frameSize)
 	case "PRIV":
-		return readPRIVFrame(r, header, frameSize)
+		return d.readPRIVFrame(header, frameSize)
 	case "APIC":
-		return readAPICFrame(r, header, frameSize)
+		return d.readAPICFrame(header, frameSize)
 	case "MCDI":
-		return readMCDIFrame(r, header, frameSize)
+		return d.readMCDIFrame(header, frameSize)
 	case "USLT":
-		return readUFIDFrame(r, header, frameSize)
+		return d.readUFIDFrame(header, frameSize)
 	default:
 		data := make([]byte, frameSize)
-		n, err := r.Read(data)
+		n, err := d.r.Read(data)
 
 		return UnsupportedFrame{
 			FrameHeader: header,
@@ -399,7 +399,8 @@ func Open(name string) (*File, error) {
 		return nil, err
 	}
 
-	tag, err := Parse(f)
+	d := NewDecoder(f)
+	tag, err := d.Parse()
 	if err != nil {
 		if _, ok := err.(notATagHeader); !ok {
 			return nil, err
@@ -424,14 +425,23 @@ func (f *File) Close() error {
 	return f.f.Close()
 }
 
+type Decoder struct {
+	r io.Reader
+	h TagHeader
+}
+
+func NewDecoder(r io.Reader) *Decoder {
+	return &Decoder{r: r}
+}
+
 // ParseHeader parses only the ID3 header.
-func ParseHeader(r io.Reader) (TagHeader, error) {
+func (d *Decoder) ParseHeader() (TagHeader, error) {
 	// TODO after using ParseHeader, it's impossible to read the rest
 	// of the tag unless the reader can be seeked back to the
 	// beginning. Should we a) provide a way to read a tag based off
 	// an existing header b) not export ParseHeader c) just document
 	// this fact?
-	header, err := readHeader(r)
+	header, err := d.readHeader()
 	// f.tagReader = io.NewSectionReader(f.f, int64(n), int64(header.Size))
 	// f.audioReader = io.NewSectionReader(f.f, int64(n)+int64(header.Size), f.fileSize-int64(header.Size))
 	if err != nil {
@@ -445,11 +455,11 @@ func ParseHeader(r io.Reader) (TagHeader, error) {
 //
 // Parse will always return a valid tag. In the case of an error, the
 // tag will be empty.
-func Parse(r io.Reader) (*Tag, error) {
+func (d *Decoder) Parse() (*Tag, error) {
 	// TODO return how many bytes we read into the reader; so people
 	// know where the audio begins
 	tag := NewTag()
-	header, err := ParseHeader(r)
+	header, err := d.ParseHeader()
 	if err != nil {
 		return tag, err
 	}
@@ -464,9 +474,9 @@ func Parse(r io.Reader) (*Tag, error) {
 		panic("not implemented: cannot parse unsynchronised tag")
 	}
 
-	tagReader := io.LimitReader(r, int64(header.Size)+tagHeaderSize)
+	d.r = io.LimitReader(d.r, int64(header.Size)+tagHeaderSize)
 	for {
-		frame, err := readFrame(tagReader)
+		frame, err := d.readFrame()
 		if err != nil {
 			if err == io.EOF {
 				break

@@ -23,10 +23,15 @@ func generateHeader(size int) []byte {
 
 type Encoder struct {
 	w io.Writer
+	// The amount of padding that will be added after the last frame.
+	Padding int
 }
 
 func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{w: w}
+	return &Encoder{
+		w:       w,
+		Padding: 1024,
+	}
 }
 
 func (e *Encoder) WriteHeader(size int) error {
@@ -49,7 +54,7 @@ func (e *Encoder) WriteFrame(f Frame) error {
 func (t *Tag) Encode(w io.Writer) error {
 	t.SetTextFrameTime("TDTG", time.Now().UTC())
 	enc := NewEncoder(w)
-	err := enc.WriteHeader(t.Frames.size() + Padding)
+	err := enc.WriteHeader(t.Frames.size() + enc.Padding)
 	if err != nil {
 		return err
 	}
@@ -64,6 +69,6 @@ func (t *Tag) Encode(w io.Writer) error {
 		}
 	}
 
-	_, err = w.Write(make([]byte, Padding))
+	_, err = w.Write(make([]byte, enc.Padding))
 	return err
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -14,9 +13,6 @@ import (
 
 // TODO reevaluate TagHeader. Right now it's a snapshot of the past
 // that doesn't reflect the present
-
-// The amount of padding that will be added after the last frame.
-var Padding = 1024
 
 // TODO make padding configurable per tag?
 
@@ -751,55 +747,55 @@ func (t *Tag) UserTextFrames() []UserTextInformationFrame {
 // 	return err
 // }
 
-func (f *File) saveNew(framesSize int) error {
-	var buf io.ReadWriter
+// func (f *File) saveNew(framesSize int) error {
+// 	var buf io.ReadWriter
 
-	// Work in memory If the old file was smaller than 10MiB, use
-	// a temporary file otherwise.
-	if InMemoryThreshold < 0 || f.fileSize < InMemoryThreshold {
-		Logging.Println("Working in memory")
-		buf = new(bytes.Buffer)
-	} else {
-		// FIXME create temporary file in same directory as the
-		// original file, then rename(), instead of copying, to avoid
-		// losing files in case of a crash
-		Logging.Println("Using a temporary file")
-		newFile, err := ioutil.TempFile("", "id3")
-		if err != nil {
-			return err
-		}
-		defer os.Remove(newFile.Name())
-		buf = newFile
-	}
+// 	// Work in memory If the old file was smaller than 10MiB, use
+// 	// a temporary file otherwise.
+// 	if InMemoryThreshold < 0 || f.fileSize < InMemoryThreshold {
+// 		Logging.Println("Working in memory")
+// 		buf = new(bytes.Buffer)
+// 	} else {
+// 		// FIXME create temporary file in same directory as the
+// 		// original file, then rename(), instead of copying, to avoid
+// 		// losing files in case of a crash
+// 		Logging.Println("Using a temporary file")
+// 		newFile, err := ioutil.TempFile("", "id3")
+// 		if err != nil {
+// 			return err
+// 		}
+// 		defer os.Remove(newFile.Name())
+// 		buf = newFile
+// 	}
 
-	err := f.SaveTo(buf)
-	if err != nil {
-		return err
-	}
+// 	err := f.SaveTo(buf)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	// We successfully generated a new file, so replace the old
-	// one with it.
-	err = truncate(f.f)
-	if err != nil {
-		return err
-	}
+// 	// We successfully generated a new file, so replace the old
+// 	// one with it.
+// 	err = truncate(f.f)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	if newFile, ok := buf.(*os.File); ok {
-		_, err = newFile.Seek(0, 0)
-		if err != nil {
-			return err
-		}
-	}
+// 	if newFile, ok := buf.(*os.File); ok {
+// 		_, err = newFile.Seek(0, 0)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
 
-	_, err = io.Copy(f.f, buf)
-	if err != nil {
-		return err
-	}
+// 	_, err = io.Copy(f.f, buf)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	f.Header.Size = framesSize + Padding
-	f.Header.Version = 0x0400
-	return nil
-}
+// 	f.Header.Size = framesSize + Padding
+// 	f.Header.Version = 0x0400
+// 	return nil
+// }
 
 // Save saves the tag to the file. If the changed tag fits into the
 // existing file, it will be overwritten in place. Otherwise the
@@ -824,7 +820,9 @@ func (f *File) Save() error {
 	// }
 	// We have to create a new file
 	Logging.Println("Writing new file")
-	return f.saveNew(framesSize)
+	// return f.saveNew(framesSize)
+	_ = framesSize
+	return nil
 }
 
 func (fm FramesMap) size() int {

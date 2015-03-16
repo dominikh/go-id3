@@ -3,7 +3,6 @@ package id3
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
 )
 
 var FrameNames = map[FrameType]string{
@@ -139,7 +138,7 @@ type FrameHeader struct {
 type Frame interface {
 	ID() FrameType
 	Value() string
-	Encode(w io.Writer) error
+	Encode() []byte
 	size() int // TODO export?
 }
 
@@ -234,17 +233,20 @@ func (f TextInformationFrame) size() int {
 	return frameLength + len(f.Text) + 1
 }
 
-func (f TextInformationFrame) Encode(w io.Writer) error {
+func (f TextInformationFrame) Encode() []byte {
 	switch f.FrameHeader.ID() {
 	case "TRDA", "TSIZ":
 		Logging.Println("Not writing header", f.FrameHeader.ID())
 		return nil
 	default:
-		return writeMany(w,
-			f.FrameHeader.serialize(f.size()-frameLength),
-			utf8byte,
-			[]byte(f.Text),
-		)
+		b1 := f.FrameHeader.serialize(f.size() - frameLength)
+		b2 := utf8byte
+		b3 := []byte(f.Text)
+		var b4 []byte
+		b4 = append(b4, b1...)
+		b4 = append(b4, b2...)
+		b4 = append(b4, b3...)
+		return b4
 	}
 }
 
@@ -256,14 +258,19 @@ func (f UserTextInformationFrame) size() int {
 	return frameLength + len(f.Description) + len(f.Text) + 2
 }
 
-func (f UserTextInformationFrame) Encode(w io.Writer) error {
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Description),
-		nul,
-		[]byte(f.Text),
-	)
+func (f UserTextInformationFrame) Encode() []byte {
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := utf8byte
+	b3 := []byte(f.Description)
+	b4 := nul
+	b5 := []byte(f.Text)
+	var b6 []byte
+	b6 = append(b6, b1...)
+	b6 = append(b6, b2...)
+	b6 = append(b6, b3...)
+	b6 = append(b6, b4...)
+	b6 = append(b6, b5...)
+	return b6
 }
 
 func (f UserTextInformationFrame) Value() string {
@@ -275,14 +282,18 @@ func (f UniqueFileIdentifierFrame) size() int {
 	return frameLength + len(f.Identifier) + len(iso) + 1
 }
 
-func (f UniqueFileIdentifierFrame) Encode(w io.Writer) error {
+func (f UniqueFileIdentifierFrame) Encode() []byte {
 	iso := utf8.toISO88591([]byte(f.Owner))
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		iso,
-		nul,
-		f.Identifier,
-	)
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := iso
+	b3 := nul
+	b4 := f.Identifier
+	var b5 []byte
+	b5 = append(b5, b1...)
+	b5 = append(b5, b2...)
+	b5 = append(b5, b3...)
+	b5 = append(b5, b4...)
+	return b5
 }
 
 func (f UniqueFileIdentifierFrame) Value() string {
@@ -293,12 +304,14 @@ func (f URLLinkFrame) size() int {
 	return frameLength + len(utf8.toISO88591([]byte(f.URL)))
 }
 
-func (f URLLinkFrame) Encode(w io.Writer) error {
+func (f URLLinkFrame) Encode() []byte {
 	iso := utf8.toISO88591([]byte(f.URL))
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		iso,
-	)
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := iso
+	var b3 []byte
+	b3 = append(b3, b1...)
+	b3 = append(b3, b2...)
+	return b3
 }
 
 func (f URLLinkFrame) Value() string {
@@ -310,15 +323,20 @@ func (f UserDefinedURLLinkFrame) size() int {
 	return frameLength + len(f.Description) + len(iso) + 2
 }
 
-func (f UserDefinedURLLinkFrame) Encode(w io.Writer) error {
+func (f UserDefinedURLLinkFrame) Encode() []byte {
 	iso := utf8.toISO88591([]byte(f.URL))
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Description),
-		nul,
-		iso,
-	)
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := utf8byte
+	b3 := []byte(f.Description)
+	b4 := nul
+	b5 := iso
+	var b6 []byte
+	b6 = append(b6, b1...)
+	b6 = append(b6, b2...)
+	b6 = append(b6, b3...)
+	b6 = append(b6, b4...)
+	b6 = append(b6, b5...)
+	return b6
 }
 
 func (f UserDefinedURLLinkFrame) Value() string {
@@ -329,15 +347,21 @@ func (f CommentFrame) size() int {
 	return frameLength + len(f.Description) + len(f.Text) + 5
 }
 
-func (f CommentFrame) Encode(w io.Writer) error {
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Language),
-		[]byte(f.Description),
-		nul,
-		[]byte(f.Text),
-	)
+func (f CommentFrame) Encode() []byte {
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := utf8byte
+	b3 := []byte(f.Language)
+	b4 := []byte(f.Description)
+	b5 := nul
+	b6 := []byte(f.Text)
+	var b7 []byte
+	b7 = append(b7, b1...)
+	b7 = append(b7, b2...)
+	b7 = append(b7, b3...)
+	b7 = append(b7, b4...)
+	b7 = append(b7, b5...)
+	b7 = append(b7, b6...)
+	return b7
 }
 
 func (f CommentFrame) Value() string {
@@ -352,13 +376,17 @@ func (f PrivateFrame) size() int {
 	return frameLength + len(f.Owner) + len(f.Data) + len(nul)
 }
 
-func (f PrivateFrame) Encode(w io.Writer) error {
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		f.Owner,
-		nul,
-		f.Data,
-	)
+func (f PrivateFrame) Encode() []byte {
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := f.Owner
+	b3 := nul
+	b4 := f.Data
+	var b5 []byte
+	b5 = append(b5, b1...)
+	b5 = append(b5, b2...)
+	b5 = append(b5, b3...)
+	b5 = append(b5, b4...)
+	return b5
 }
 
 func (f PictureFrame) Value() string {
@@ -376,17 +404,25 @@ func (f PictureFrame) size() int {
 		len(f.Data)
 }
 
-func (f PictureFrame) Encode(w io.Writer) error {
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		utf8.toISO88591([]byte(f.MIMEType)),
-		nul,
-		[]byte{byte(f.PictureType)},
-		[]byte(f.Description),
-		nul,
-		f.Data,
-	)
+func (f PictureFrame) Encode() []byte {
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := utf8byte
+	b3 := utf8.toISO88591([]byte(f.MIMEType))
+	b4 := nul
+	b5 := []byte{byte(f.PictureType)}
+	b6 := []byte(f.Description)
+	b7 := nul
+	b8 := f.Data
+	var b9 []byte
+	b9 = append(b9, b1...)
+	b9 = append(b9, b2...)
+	b9 = append(b9, b3...)
+	b9 = append(b9, b4...)
+	b9 = append(b9, b5...)
+	b9 = append(b9, b6...)
+	b9 = append(b9, b7...)
+	b9 = append(b9, b8...)
+	return b9
 }
 
 func (f MusicCDIdentifierFrame) Value() string {
@@ -397,11 +433,13 @@ func (f MusicCDIdentifierFrame) size() int {
 	return frameLength + len(f.TOC)
 }
 
-func (f MusicCDIdentifierFrame) Encode(w io.Writer) error {
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		f.TOC,
-	)
+func (f MusicCDIdentifierFrame) Encode() []byte {
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := f.TOC
+	var b3 []byte
+	b3 = append(b3, b1...)
+	b3 = append(b3, b2...)
+	return b3
 }
 
 func (f UnsynchronisedLyricsFrame) Value() string {
@@ -412,27 +450,35 @@ func (f UnsynchronisedLyricsFrame) size() int {
 	return frameLength + 5 + len(f.Description) + len(f.Lyrics)
 }
 
-func (f UnsynchronisedLyricsFrame) Encode(w io.Writer) error {
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		utf8byte,
-		[]byte(f.Language),
-		[]byte(f.Description),
-		nul,
-		[]byte(f.Lyrics),
-	)
+func (f UnsynchronisedLyricsFrame) Encode() []byte {
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := utf8byte
+	b3 := []byte(f.Language)
+	b4 := []byte(f.Description)
+	b5 := nul
+	b6 := []byte(f.Lyrics)
+	var b7 []byte
+	b7 = append(b7, b1...)
+	b7 = append(b7, b2...)
+	b7 = append(b7, b3...)
+	b7 = append(b7, b4...)
+	b7 = append(b7, b5...)
+	b7 = append(b7, b6...)
+	return b7
 }
 
 func (f UnsupportedFrame) size() int {
 	return frameLength + len(f.Data)
 }
 
-func (f UnsupportedFrame) Encode(w io.Writer) error {
+func (f UnsupportedFrame) Encode() []byte {
 	// TODO check header if unsupported frame should be dropped or copied verbatim
-	return writeMany(w,
-		f.FrameHeader.serialize(f.size()-frameLength),
-		f.Data,
-	)
+	b1 := f.FrameHeader.serialize(f.size() - frameLength)
+	b2 := f.Data
+	var b3 []byte
+	b3 = append(b3, b1...)
+	b3 = append(b3, b2...)
+	return b3
 }
 
 func (UnsupportedFrame) Value() string {

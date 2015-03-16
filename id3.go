@@ -126,7 +126,9 @@ func NewEncoder(w io.Writer) *Encoder {
 }
 
 func (e *Encoder) WriteFrame(f Frame) error {
-	return f.Encode(e.w)
+	b = f.Encode()
+	_, err = e.w.Write(b)
+	return err
 }
 
 func (t *Tag) Encode(w io.Writer) error {
@@ -137,10 +139,12 @@ func (t *Tag) Encode(w io.Writer) error {
 		return err
 	}
 
+	enc := NewEncoder(w)
+
 	// TODO write important frames first
 	for _, frames := range t.Frames {
 		for _, frame := range frames {
-			err := frame.Encode(w)
+			err := enc.WriteFrame(frame)
 			if err != nil {
 				return err
 			}

@@ -1042,7 +1042,7 @@ func (f *File) saveNew(framesSize int) error {
 
 	// Work in memory If the old file was smaller than 10MiB, use
 	// a temporary file otherwise.
-	if f.fileSize < InMemoryThreshold {
+	if InMemoryThreshold < 0 || f.fileSize < InMemoryThreshold {
 		Logging.Println("Working in memory")
 		buf = new(bytes.Buffer)
 	} else {

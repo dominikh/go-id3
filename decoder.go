@@ -24,9 +24,14 @@ func (d *Decoder) ParseHeader() (TagHeader, error) {
 	}
 
 	d.h = header
+	// FIXME why are we adding tagHeaderSize? we already read the header
 	d.r = io.LimitReader(d.r, int64(header.Size)+tagHeaderSize)
 
 	return header, nil
+}
+
+func (d *Decoder) remaining() int64 {
+	return d.r.(*io.LimitedReader).N
 }
 
 // Parse parses a tag.
@@ -85,14 +90,12 @@ func readBinary(r io.Reader, args ...interface{}) (err error) {
 // readHeader reads an ID3v2 header. It expects the reader to be
 // seeked to the beginning of the header.
 func (d *Decoder) readHeader() (header TagHeader, err error) {
-	var (
-		bytes struct {
-			Magic   [3]byte
-			Version [2]byte
-			Flags   byte
-			Size    [4]byte
-		}
-	)
+	var bytes struct {
+		Magic   [3]byte
+		Version [2]byte
+		Flags   byte
+		Size    [4]byte
+	}
 
 	err = binary.Read(d.r, binary.BigEndian, &bytes)
 	if err != nil {
@@ -115,6 +118,10 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 
 // ParseFrame reads the next ID3 frame.
 func (d *Decoder) ParseFrame() (Frame, error) {
+	if d.remaining() == 0 {
+		return nil, io.EOF
+	}
+
 	var (
 		headerBytes struct {
 			ID    [4]byte
@@ -126,11 +133,6 @@ func (d *Decoder) ParseFrame() (Frame, error) {
 
 	err := binary.Read(d.r, binary.BigEndian, &headerBytes)
 	if err != nil {
-		if err == io.ErrUnexpectedEOF {
-			// If we couldn't read the header assume we were at the
-			// end of the tag.
-			return nil, io.EOF
-		}
 		return nil, err
 	}
 

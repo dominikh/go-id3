@@ -25,8 +25,7 @@ func (d *Decoder) ParseHeader() (TagHeader, error) {
 	}
 
 	d.h = header
-	// FIXME why are we adding tagHeaderSize? we already read the header
-	d.r = io.LimitReader(d.r, int64(header.Size)+tagHeaderSize)
+	d.r = io.LimitReader(d.r, int64(header.Size))
 
 	return header, nil
 }

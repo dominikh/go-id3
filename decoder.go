@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"io/ioutil"
 	"os"
 )
 
@@ -116,7 +117,9 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 	return header, nil
 }
 
-// ParseFrame reads the next ID3 frame.
+// ParseFrame reads the next ID3 frame. When it reaches padding, it
+// will discard it and return io.EOF. This should set the reader
+// immediately before the audio data.
 func (d *Decoder) ParseFrame() (Frame, error) {
 	if d.remaining() == 0 {
 		return nil, io.EOF
@@ -136,8 +139,12 @@ func (d *Decoder) ParseFrame() (Frame, error) {
 		return nil, err
 	}
 
-	// We're in the padding, return io.EOF
+	// We're in the padding, discard remaining bytes and return io.EOF
 	if headerBytes.ID == [4]byte{0, 0, 0, 0} {
+		_, err := io.Copy(ioutil.Discard, d.r)
+		if err != nil {
+			return nil, err
+		}
 		return nil, io.EOF
 	}
 

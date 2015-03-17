@@ -60,10 +60,9 @@ func (e *Encoder) Write(b []byte) (n int, err error) {
 	return e.w.Write(b)
 }
 
-func (t *Tag) Encode(w io.Writer) error {
+func (e *Encoder) WriteTag(t *Tag) error {
 	t.SetTextFrameTime("TDTG", time.Now().UTC())
-	enc := NewEncoder(w)
-	err := enc.WriteHeader(t.Frames.size() + enc.Padding)
+	err := e.WriteHeader(t.Frames.size() + e.Padding)
 	if err != nil {
 		return err
 	}
@@ -71,12 +70,12 @@ func (t *Tag) Encode(w io.Writer) error {
 	// TODO write important frames first
 	for _, frames := range t.Frames {
 		for _, frame := range frames {
-			err := enc.WriteFrame(frame)
+			err := e.WriteFrame(frame)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	return enc.WritePadding()
+	return e.WritePadding()
 }

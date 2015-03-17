@@ -838,8 +838,9 @@ func (fm FramesMap) size() int {
 
 func (f *File) SaveTo(w io.Writer) error {
 	// TODO document that this will not update version/HasTag/... for
-	// this *File
-	err := f.Tag.Encode(w)
+	// this *File. maybe we should return a new *File?
+	enc := NewEncoder(w)
+	err := enc.WriteTag(f.Tag)
 	if err != nil {
 		return err
 	}

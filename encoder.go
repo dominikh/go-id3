@@ -36,28 +36,24 @@ func NewEncoder(w io.Writer) *Encoder {
 
 func (e *Encoder) WriteHeader(size int) error {
 	h := generateHeader(size)
-	_, err := e.Write(h)
+	_, err := e.w.Write(h)
 	return err
 }
 
 func (e *Encoder) WriteFrame(f Frame) error {
 	b := f.Header().serialize(f.size() - frameLength)
-	_, err := e.Write(b)
+	_, err := e.w.Write(b)
 	if err != nil {
 		return err
 	}
 	b = f.Encode()
-	_, err = e.Write(b)
+	_, err = e.w.Write(b)
 	return err
 }
 
 func (e *Encoder) WritePadding() error {
-	_, err := e.Write(make([]byte, e.Padding))
+	_, err := e.w.Write(make([]byte, e.Padding))
 	return err
-}
-
-func (e *Encoder) Write(b []byte) (n int, err error) {
-	return e.w.Write(b)
 }
 
 func (e *Encoder) WriteTag(t *Tag) error {

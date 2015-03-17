@@ -107,6 +107,18 @@ type Comment struct {
 	Text        string
 }
 
+func concat(bs ...[]byte) []byte {
+	n := 0
+	for _, b := range bs {
+		n += len(b)
+	}
+	out := make([]byte, 0, n)
+	for _, b := range bs {
+		out = append(out, b...)
+	}
+	return out
+}
+
 // NewTag returns an empty tag.
 func NewTag() *Tag {
 	return &Tag{Frames: make(FramesMap)}

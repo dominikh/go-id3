@@ -25,7 +25,7 @@ func (d *Decoder) ParseHeader() (TagHeader, error) {
 	}
 
 	d.h = header
-	d.r = io.LimitReader(d.r, int64(header.Size))
+	d.r = io.LimitReader(d.r, int64(header.size))
 
 	return header, nil
 }
@@ -111,7 +111,7 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 
 	header.Version = version
 	header.Flags = HeaderFlags(bytes.Flags)
-	header.Size = desynchsafeInt(bytes.Size)
+	header.size = desynchsafeInt(bytes.Size)
 
 	return header, nil
 }
@@ -248,7 +248,8 @@ func NewFile(file *os.File, tag *Tag) (*File, error) {
 		Tag:      tag,
 	}
 
-	f.audioReader = io.NewSectionReader(file, tagHeaderSize+int64(tag.Header.Size), f.fileSize-int64(tag.Header.Size))
+	f.audioReader = io.NewSectionReader(file,
+		tagHeaderSize+int64(tag.Header.size), f.fileSize-int64(tag.Header.size))
 
 	return f, nil
 }

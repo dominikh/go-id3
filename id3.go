@@ -85,7 +85,7 @@ type UnsupportedVersion struct {
 type TagHeader struct {
 	Version Version // The ID3v2 version the file currently has on disk
 	Flags   HeaderFlags
-	Size    int // The size of the tag (exluding the size of the header)
+	size    int // The size of the tag (exluding the size of the header)
 }
 
 type Tag struct {

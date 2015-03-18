@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"io"
 	"io/ioutil"
-	"os"
 )
 
 type Decoder struct {
@@ -232,58 +231,6 @@ func (d *Decoder) ParseFrame() (Frame, error) {
 			Data:        data[:n],
 		}, err
 	}
-}
-
-// New creates a new file from an existing *os.File and Tag. If you
-// plan to save tags the file needs to be opened read and write.
-func NewFile(file *os.File, tag *Tag) (*File, error) {
-	stat, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	f := &File{
-		f:        file,
-		fileSize: stat.Size(),
-		Tag:      tag,
-	}
-
-	f.audioReader = io.NewSectionReader(file,
-		tagHeaderSize+int64(tag.Header.size), f.fileSize-int64(tag.Header.size))
-
-	return f, nil
-}
-
-// Open opens the file with the given name in RW mode and parses its
-// tag. If there is no tag, (*File).HasTag() will return false.
-//
-// Call Close() to close the underlying *os.File when done.
-func Open(name string) (*File, error) {
-	// TODO improve documentation. HasTag() will only be false until
-	// the first save; and there will be an empty tag to work with.
-	f, err := os.OpenFile(name, os.O_RDWR, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	d := NewDecoder(f)
-	tag, err := d.Parse()
-	if err != nil {
-		if _, ok := err.(notATagHeader); !ok {
-			return nil, err
-		}
-	}
-	file, err := NewFile(f, tag)
-	if err != nil {
-		return nil, err
-	}
-
-	return file, nil
-}
-
-// HasTag returns true when the underlying file has a tag.
-func (f *File) HasTag() bool {
-	return f.Tag.Header.Version > 0
 }
 
 func (d *Decoder) readTXXXFrame(header FrameHeader, frameSize int) (Frame, error) {

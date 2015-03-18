@@ -19,10 +19,6 @@ import (
 // Enables logging if set to true.
 var Logging LogFlag
 
-// The size limit in bytes for in-memory buffers when rewriting files
-// before falling back to temporary files. A negative value will
-// always use an in-memory buffer.
-var InMemoryThreshold = int64(1024 * 1024 * 10) // 10 MB
 
 // TODO make this configurable per file?
 
@@ -91,14 +87,6 @@ type TagHeader struct {
 type Tag struct {
 	Header TagHeader
 	Frames FramesMap
-}
-
-type File struct {
-	f           *os.File
-	fileSize    int64
-	audioReader io.ReadSeeker
-	HasTags     bool // true if the actual file has tags
-	*Tag
 }
 
 type Comment struct {
@@ -198,12 +186,6 @@ func (f FrameFlags) Grouped() bool {
 
 func (v Version) String() string {
 	return fmt.Sprintf("ID3v2.%.1d.%.1d", v>>8, v&0xFF)
-}
-
-// Close closes the underlying os.File. You cannot use Save
-// afterwards.
-func (f *File) Close() error {
-	return f.f.Close()
 }
 
 // upgrade upgrades tags from an older version to IDv2.4. It should
@@ -733,110 +715,6 @@ func (t *Tag) UserTextFrames() []UserTextInformationFrame {
 	return res
 }
 
-// func (f *File) saveInplace(framesSize int) error {
-// 	// TODO consider writing headers/frames into buffer first, to
-// 	// not break existing file in case of error
-// 	header := generateHeader(f.Header.Size)
-
-// 	_, err := f.f.Seek(0, 0)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	_, err = f.f.Write(header)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	err = f.Frames.Encode(f.f)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	f.Header.Version = 0x0400
-// 	// Blank out remainder of previous tags
-// 	_, err = f.f.Write(make([]byte, f.Header.Size-framesSize))
-// 	return err
-// }
-
-// func (f *File) saveNew(framesSize int) error {
-// 	var buf io.ReadWriter
-
-// 	// Work in memory If the old file was smaller than 10MiB, use
-// 	// a temporary file otherwise.
-// 	if InMemoryThreshold < 0 || f.fileSize < InMemoryThreshold {
-// 		Logging.Println("Working in memory")
-// 		buf = new(bytes.Buffer)
-// 	} else {
-// 		// FIXME create temporary file in same directory as the
-// 		// original file, then rename(), instead of copying, to avoid
-// 		// losing files in case of a crash
-// 		Logging.Println("Using a temporary file")
-// 		newFile, err := ioutil.TempFile("", "id3")
-// 		if err != nil {
-// 			return err
-// 		}
-// 		defer os.Remove(newFile.Name())
-// 		buf = newFile
-// 	}
-
-// 	err := f.SaveTo(buf)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	// We successfully generated a new file, so replace the old
-// 	// one with it.
-// 	err = truncate(f.f)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if newFile, ok := buf.(*os.File); ok {
-// 		_, err = newFile.Seek(0, 0)
-// 		if err != nil {
-// 			return err
-// 		}
-// 	}
-
-// 	_, err = io.Copy(f.f, buf)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	f.Header.Size = framesSize + Padding
-// 	f.Header.Version = 0x0400
-// 	return nil
-// }
-
-// Save saves the tag to the file. If the changed tag fits into the
-// existing file, it will be overwritten in place. Otherwise the
-// entire file will be rewritten
-//
-// If you require backups, you need to create them yourself.
-func (f *File) Save() error {
-	// TODO document the exact overwrite behaviour
-	//
-	// , either by constructing a new file in memory (see the variable
-	// InMemoryThreshold) or by writing to a temporary file, which
-	// will then get copied over
-
-	f.SetTextFrameTime("TDTG", time.Now().UTC())
-	framesSize := f.Frames.size()
-
-	// if f.HasTag() && f.Header.Size >= framesSize && len(f.Frames) > 0 {
-	// 	// The file already has tags and there's enough room to write
-	// 	// ours.
-	// 	Logging.Println("Writing in-place")
-	// 	return f.saveInplace(framesSize)
-	// }
-	// We have to create a new file
-	Logging.Println("Writing new file")
-	// return f.saveNew(framesSize)
-	_ = framesSize
-	return nil
-}
-
 func (fm FramesMap) size() int {
 	size := 0
 	for _, frames := range fm {
@@ -846,25 +724,6 @@ func (fm FramesMap) size() int {
 	}
 
 	return size
-}
-
-func (f *File) SaveTo(w io.Writer) error {
-	// TODO document that this will not update version/HasTag/... for
-	// this *File. maybe we should return a new *File?
-	enc := NewEncoder(w)
-	err := enc.WriteTag(f.Tag)
-	if err != nil {
-		return err
-	}
-
-	_, err = f.audioReader.Seek(0, 0)
-	if err != nil {
-		return err
-	}
-
-	// Copy audio data
-	_, err = io.Copy(w, f.audioReader)
-	return err
 }
 
 func writeMany(w io.Writer, data ...[]byte) error {

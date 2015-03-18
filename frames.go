@@ -137,7 +137,7 @@ type Frame interface {
 	Header() FrameHeader
 	Value() string
 	Encode() []byte
-	size() int // TODO export?
+	Size() int
 }
 
 type TextInformationFrame struct {
@@ -223,7 +223,7 @@ func (f FrameHeader) serialize(size int) []byte {
 	return out
 }
 
-func (f TextInformationFrame) size() int {
+func (f TextInformationFrame) Size() int {
 	if f.FrameHeader.ID() == "TRDA" {
 		return 0
 	}
@@ -245,7 +245,7 @@ func (f TextInformationFrame) Value() string {
 	return f.Text
 }
 
-func (f UserTextInformationFrame) size() int {
+func (f UserTextInformationFrame) Size() int {
 	return frameLength + len(f.Description) + len(f.Text) + 2
 }
 
@@ -257,7 +257,7 @@ func (f UserTextInformationFrame) Value() string {
 	return f.Text
 }
 
-func (f UniqueFileIdentifierFrame) size() int {
+func (f UniqueFileIdentifierFrame) Size() int {
 	iso := utf8.toISO88591([]byte(f.Owner))
 	return frameLength + len(f.Identifier) + len(iso) + 1
 }
@@ -271,7 +271,7 @@ func (f UniqueFileIdentifierFrame) Value() string {
 	return string(f.Identifier)
 }
 
-func (f URLLinkFrame) size() int {
+func (f URLLinkFrame) Size() int {
 	return frameLength + len(utf8.toISO88591([]byte(f.URL)))
 }
 
@@ -284,7 +284,7 @@ func (f URLLinkFrame) Value() string {
 	return f.URL
 }
 
-func (f UserDefinedURLLinkFrame) size() int {
+func (f UserDefinedURLLinkFrame) Size() int {
 	iso := utf8.toISO88591([]byte(f.URL))
 	return frameLength + len(f.Description) + len(iso) + 2
 }
@@ -298,7 +298,7 @@ func (f UserDefinedURLLinkFrame) Value() string {
 	return f.URL
 }
 
-func (f CommentFrame) size() int {
+func (f CommentFrame) Size() int {
 	return frameLength + len(f.Description) + len(f.Text) + 5
 }
 
@@ -314,7 +314,7 @@ func (f PrivateFrame) Value() string {
 	return string(f.Data)
 }
 
-func (f PrivateFrame) size() int {
+func (f PrivateFrame) Size() int {
 	return frameLength + len(f.Owner) + len(f.Data) + len(nul)
 }
 
@@ -326,7 +326,7 @@ func (f PictureFrame) Value() string {
 	return string(f.Data)
 }
 
-func (f PictureFrame) size() int {
+func (f PictureFrame) Size() int {
 	return frameLength +
 		1 +
 		len(utf8.toISO88591([]byte(f.MIMEType))) +
@@ -346,7 +346,7 @@ func (f MusicCDIdentifierFrame) Value() string {
 	return string(f.TOC)
 }
 
-func (f MusicCDIdentifierFrame) size() int {
+func (f MusicCDIdentifierFrame) Size() int {
 	return frameLength + len(f.TOC)
 }
 
@@ -358,7 +358,7 @@ func (f UnsynchronisedLyricsFrame) Value() string {
 	return f.Lyrics
 }
 
-func (f UnsynchronisedLyricsFrame) size() int {
+func (f UnsynchronisedLyricsFrame) Size() int {
 	return frameLength + 5 + len(f.Description) + len(f.Lyrics)
 }
 
@@ -366,7 +366,7 @@ func (f UnsynchronisedLyricsFrame) Encode() []byte {
 	return concat(utf8byte, []byte(f.Language), []byte(f.Description), nul, []byte(f.Lyrics))
 }
 
-func (f UnsupportedFrame) size() int {
+func (f UnsupportedFrame) Size() int {
 	return frameLength + len(f.Data)
 }
 

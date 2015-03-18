@@ -32,7 +32,7 @@ func (e *Encoder) WriteHeader(size int) error {
 }
 
 func (e *Encoder) WriteFrame(f Frame) error {
-	b := f.Header().serialize(f.size() - frameLength)
+	b := f.Header().serialize(f.Size() - frameLength)
 	_, err := e.w.Write(b)
 	if err != nil {
 		return err

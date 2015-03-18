@@ -841,7 +841,7 @@ func (fm FramesMap) size() int {
 	size := 0
 	for _, frames := range fm {
 		for _, frame := range frames {
-			size += frame.size()
+			size += frame.Size()
 		}
 	}
 

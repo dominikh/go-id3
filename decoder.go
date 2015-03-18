@@ -56,9 +56,10 @@ func (d *Decoder) remaining() int64 {
 // data. If there wasn't a valid tag, however, the position of the
 // reader is undefined. If you're not sure if your reader starts with
 // a tag at all, consider using Check first.
+//
+// Parse cannot be called if either ParseHeader or ParseFrame have
+// been called for the current tag.
 func (d *Decoder) Parse() (*Tag, error) {
-	// TODO return how many bytes we read into the reader; so people
-	// know where the audio begins
 	tag := NewTag()
 	header, err := d.ParseHeader()
 	if err != nil {
@@ -135,8 +136,10 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 }
 
 // ParseFrame reads the next ID3 frame. When it reaches padding, it
-// will discard it and return io.EOF. This should set the reader
-// immediately before the audio data.
+// will read and discard all of it and return io.EOF. This should set
+// the reader immediately before the audio data.
+//
+// ParseHeader must be called before calling ParseFrame.
 func (d *Decoder) ParseFrame() (Frame, error) {
 	if d.remaining() == 0 {
 		return nil, io.EOF

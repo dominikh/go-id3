@@ -50,6 +50,12 @@ func (d *Decoder) remaining() int64 {
 //
 // Parse will always return a valid tag. In the case of an error, the
 // tag will be empty.
+//
+// If Parse successfully parsed a tag, the reader will be positioned
+// immediately after the tag, which usually is directly before audio
+// data. If there wasn't a valid tag, however, the position of the
+// reader is undefined. If you're not sure if your reader starts with
+// a tag at all, consider using Check first.
 func (d *Decoder) Parse() (*Tag, error) {
 	// TODO return how many bytes we read into the reader; so people
 	// know where the audio begins

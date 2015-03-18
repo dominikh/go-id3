@@ -7,6 +7,19 @@ import (
 	"io/ioutil"
 )
 
+type fnFrameReader func(r io.Reader, header FrameHeader, frameSize int) (Frame, error)
+
+var frameReaders = map[FrameType]fnFrameReader{
+	"TXXX": readTXXXFrame,
+	"WXXX": readWXXXFrame,
+	"UFID": readUFIDFrame,
+	"COMM": readCOMMFrame,
+	"PRIV": readPRIVFrame,
+	"APIC": readAPICFrame,
+	"MCDI": readMCDIFrame,
+	"USLT": readUFIDFrame,
+}
+
 type Peeker interface {
 	Peek(n int) ([]byte, error)
 }
@@ -227,24 +240,8 @@ func (d *Decoder) ParseFrame() (Frame, error) {
 		return frame, nil
 	}
 
-	switch header.id {
-	case "TXXX":
-		return d.readTXXXFrame(header, frameSize)
-	case "WXXX":
-		return d.readWXXXFrame(header, frameSize)
-	case "UFID":
-		return d.readUFIDFrame(header, frameSize)
-	case "COMM":
-		return d.readCOMMFrame(header, frameSize)
-	case "PRIV":
-		return d.readPRIVFrame(header, frameSize)
-	case "APIC":
-		return d.readAPICFrame(header, frameSize)
-	case "MCDI":
-		return d.readMCDIFrame(header, frameSize)
-	case "USLT":
-		return d.readUFIDFrame(header, frameSize)
-	default:
+	fn, ok := frameReaders[header.id]
+	if !ok {
 		data := make([]byte, frameSize)
 		n, err := d.r.Read(data)
 
@@ -253,14 +250,15 @@ func (d *Decoder) ParseFrame() (Frame, error) {
 			Data:        data[:n],
 		}, err
 	}
+	return fn(d.r, header, frameSize)
 }
 
-func (d *Decoder) readTXXXFrame(header FrameHeader, frameSize int) (Frame, error) {
+func readTXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	var encoding Encoding
 	frame := UserTextInformationFrame{FrameHeader: header}
 	rest := make([]byte, frameSize-1)
 
-	err := readBinary(d.r, &encoding, &rest)
+	err := readBinary(r, &encoding, &rest)
 	if err != nil {
 		return nil, err
 	}
@@ -272,12 +270,12 @@ func (d *Decoder) readTXXXFrame(header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func (d *Decoder) readWXXXFrame(header FrameHeader, frameSize int) (Frame, error) {
+func readWXXXFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	var encoding Encoding
 	frame := UserDefinedURLLinkFrame{FrameHeader: header}
 	rest := make([]byte, frameSize-1)
 
-	err := readBinary(d.r, &encoding, &rest)
+	err := readBinary(r, &encoding, &rest)
 	if err != nil {
 		return nil, err
 	}
@@ -289,11 +287,11 @@ func (d *Decoder) readWXXXFrame(header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func (d *Decoder) readUFIDFrame(header FrameHeader, frameSize int) (Frame, error) {
+func readUFIDFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	frame := UniqueFileIdentifierFrame{FrameHeader: header}
 	rest := make([]byte, frameSize)
 
-	err := binary.Read(d.r, binary.BigEndian, rest)
+	err := binary.Read(r, binary.BigEndian, rest)
 	if err != nil {
 		return nil, err
 	}
@@ -305,7 +303,7 @@ func (d *Decoder) readUFIDFrame(header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func (d *Decoder) readCOMMFrame(header FrameHeader, frameSize int) (Frame, error) {
+func readCOMMFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	frame := CommentFrame{FrameHeader: header}
 	var (
 		encoding Encoding
@@ -314,7 +312,7 @@ func (d *Decoder) readCOMMFrame(header FrameHeader, frameSize int) (Frame, error
 	)
 	rest = make([]byte, frameSize-4)
 
-	err := readBinary(d.r, &encoding, &language, &rest)
+	err := readBinary(r, &encoding, &language, &rest)
 	if err != nil {
 		return nil, err
 	}
@@ -329,10 +327,10 @@ func (d *Decoder) readCOMMFrame(header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func (d *Decoder) readPRIVFrame(header FrameHeader, frameSize int) (Frame, error) {
+func readPRIVFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	frame := PrivateFrame{FrameHeader: header}
 	data := make([]byte, frameSize)
-	_, err := d.r.Read(data)
+	_, err := r.Read(data)
 	if err != nil {
 		return frame, err
 	}
@@ -344,14 +342,14 @@ func (d *Decoder) readPRIVFrame(header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func (d *Decoder) readAPICFrame(header FrameHeader, frameSize int) (Frame, error) {
+func readAPICFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	frame := PictureFrame{FrameHeader: header}
 	var (
 		encoding Encoding
 		rest     []byte
 	)
 	rest = make([]byte, frameSize-1)
-	err := readBinary(d.r, &encoding, &rest)
+	err := readBinary(r, &encoding, &rest)
 	if err != nil {
 		return frame, err
 	}
@@ -367,14 +365,14 @@ func (d *Decoder) readAPICFrame(header FrameHeader, frameSize int) (Frame, error
 	return frame, nil
 }
 
-func (d *Decoder) readMCDIFrame(header FrameHeader, frameSize int) (Frame, error) {
+func readMCDIFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	frame := MusicCDIdentifierFrame{FrameHeader: header}
 	frame.TOC = make([]byte, frameSize)
-	_, err := d.r.Read(frame.TOC)
+	_, err := r.Read(frame.TOC)
 	return frame, err
 }
 
-func (d *Decoder) readUSLTFrame(header FrameHeader, frameSize int) (Frame, error) {
+func readUSLTFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error) {
 	frame := UnsynchronisedLyricsFrame{FrameHeader: header}
 	var (
 		encoding Encoding
@@ -383,7 +381,7 @@ func (d *Decoder) readUSLTFrame(header FrameHeader, frameSize int) (Frame, error
 	)
 	rest = make([]byte, frameSize-4)
 
-	err := readBinary(d.r, &encoding, &language, rest)
+	err := readBinary(r, &encoding, &language, rest)
 	if err != nil {
 		return frame, err
 	}

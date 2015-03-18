@@ -1,7 +1,9 @@
 package id3
 
 import (
+	"bufio"
 	"bytes"
+	"strings"
 	"testing"
 	"time"
 )
@@ -124,6 +126,27 @@ func TestUserFrameNameParsing(t *testing.T) {
 		if out != test.outName || ok != test.outBool {
 			t.Fatalf("Didn't parse user frame name correctly. Expected: %q/%t, got %q/%t",
 				test.outName, test.outBool, out, ok)
+		}
+	}
+}
+
+func TestCheck(t *testing.T) {
+	tests := []struct {
+		in string
+		ok bool
+	}{
+		{"ID3stuff", true},
+		{"NotID3stuff", false},
+	}
+
+	for _, test := range tests {
+		r := bufio.NewReader(strings.NewReader(test.in))
+		ok, err := Check(r)
+		if err != nil {
+			t.Errorf("Unexpected error %q", err)
+		}
+		if ok != test.ok {
+			t.Errorf("expected ok = %T for %q, got %T", test.ok, test.in, ok)
 		}
 	}
 }

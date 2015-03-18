@@ -19,6 +19,7 @@ import (
 // Enables logging if set to true.
 var Logging LogFlag
 
+var Magic = [3]byte{0x49, 0x44, 0x33}
 
 // TODO make this configurable per file?
 

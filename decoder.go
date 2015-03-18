@@ -100,7 +100,7 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 	if err != nil {
 		return header, err
 	}
-	if bytes.Magic != [3]byte{0x49, 0x44, 0x33} {
+	if bytes.Magic != Magic {
 		return TagHeader{}, notATagHeader{bytes.Magic}
 	}
 	version := Version(int16(bytes.Version[0])<<8 | int16(bytes.Version[1]))

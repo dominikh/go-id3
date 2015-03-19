@@ -239,6 +239,8 @@ func (t *Tag) upgrade() {
 		}
 	}
 
+	t.Header.Version = 0x0400
+
 	// TODO EQUA → EQU2
 	// TODO IPL → TMCL, TIPL
 	// TODO RVAD → RVA2

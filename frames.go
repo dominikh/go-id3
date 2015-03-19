@@ -133,7 +133,7 @@ type FrameHeader struct {
 func (h FrameHeader) Header() FrameHeader { return h }
 
 type Frame interface {
-	ID() FrameType
+	ID() FrameType // TODO consider renaming to Type()
 	Header() FrameHeader
 	Value() string
 	Encode() []byte
@@ -375,7 +375,6 @@ func (f UnsupportedFrame) Encode() []byte {
 	return f.Data
 }
 
-func (UnsupportedFrame) Value() string {
-	// TODO return raw data
-	return ""
+func (f UnsupportedFrame) Value() string {
+	return string(f.Data)
 }

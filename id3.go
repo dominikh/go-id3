@@ -13,8 +13,6 @@ import (
 // TODO reevaluate TagHeader. Right now it's a snapshot of the past
 // that doesn't reflect the present
 
-// TODO make padding configurable per tag?
-
 // Enables logging if set to true.
 var Logging LogFlag
 
@@ -277,7 +275,7 @@ func (t *Tag) Validate() error {
 }
 
 // Sanitize will remove all frames that aren't valid. Check the
-// documentation of (*File).Validate() to see what "valid" means.
+// documentation of (*Tag).Validate() to see what "valid" means.
 func (t *Tag) Sanitize() {
 	panic("not implemented") // FIXME
 }

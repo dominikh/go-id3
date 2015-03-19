@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"honnef.co/go/id3"
 )
@@ -36,19 +35,14 @@ func printFile(name string) {
 		return
 	}
 
-	for typ, frames := range tag.Frames {
-		if typ == "TXXX" {
-			for _, frame := range frames {
-				frame := frame.(id3.UserTextInformationFrame)
-				fmt.Printf("%s: %s\n", frame.Description, frame.Text)
-			}
+	for _, frame := range tag.Frames {
+		if frame.ID() == "TXXX" {
+			frame := frame.(id3.UserTextInformationFrame)
+			fmt.Printf("%s: %s\n", frame.Description, frame.Text)
 			continue
 		}
-		var vals []string
-		for _, frame := range frames {
-			vals = append(vals, frame.Value())
-		}
-		fmt.Printf("%s: %s\n", typ.String(), strings.Join(vals, ", "))
+
+		fmt.Printf("%s: %s\n", frame.ID(), frame.Value())
 	}
 }
 

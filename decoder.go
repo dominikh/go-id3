@@ -98,7 +98,7 @@ func (d *Decoder) Parse() (*Tag, error) {
 
 			return tag, err
 		}
-		tag.Frames[frame.ID()] = append(tag.Frames[frame.ID()], frame)
+		tag.Frames = append(tag.Frames, frame)
 	}
 
 	if header.Version < 0x0400 {

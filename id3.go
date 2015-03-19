@@ -59,7 +59,6 @@ type HeaderFlags byte
 type FrameFlags uint16
 type Version int16
 type FrameType string
-type FramesMap map[FrameType][]Frame
 type PictureType byte
 
 type NotAFrameHeader struct {
@@ -87,9 +86,11 @@ type TagHeader struct {
 
 type Tag struct {
 	Header TagHeader
-	Frames FramesMap
+	Frames []Frame
 }
 
+// TODO do we really need a Comment struct, or can we just return the
+// CommentFrame?
 type Comment struct {
 	Language    string
 	Description string
@@ -110,7 +111,7 @@ func concat(bs ...[]byte) []byte {
 
 // NewTag returns an empty tag.
 func NewTag() *Tag {
-	return &Tag{Frames: make(FramesMap)}
+	return &Tag{}
 }
 
 func (f FrameType) String() string {
@@ -233,26 +234,28 @@ func (t *Tag) upgrade() {
 		}
 	}
 
-	for name := range t.Frames {
-		switch name {
+	for _, frame := range t.Frames {
+		switch frame.ID() {
 		case "TLAN", "TCON", "TPE1", "TOPE", "TCOM", "TEXT", "TOLY":
-			Logging.Println("Replacing / with x00 for", name)
-			t.SetTextFrameSlice(name, strings.Split(t.GetTextFrame(name), "/"))
+			Logging.Println("Replacing / with x00 for", frame.ID())
+			t.SetTextFrameSlice(frame.ID(), strings.Split(frame.Value(), "/"))
 		}
 	}
+
 	// TODO EQUA → EQU2
 	// TODO IPL → TMCL, TIPL
 	// TODO RVAD → RVA2
 	// TODO TRDA → TDRL
 }
 
-// Clear removes all tags from the file.
-func (t *Tag) Clear() {
-	t.Frames = make(FramesMap)
-}
-
 func (t *Tag) RemoveFrames(name FrameType) {
-	delete(t.Frames, name)
+	var frames []Frame
+	for _, frame := range t.Frames {
+		if frame.ID() != name {
+			frames = append(frames, frame)
+		}
+	}
+	t.Frames = frames
 }
 
 // Validate checks whether the tags are conforming to the
@@ -537,7 +540,7 @@ func (t *Tag) SetMood(mood string) {
 }
 
 func (t *Tag) Comments() []Comment {
-	frames := t.Frames["COMM"]
+	frames := t.GetFrames("COMM")
 	comments := make([]Comment, len(frames))
 
 	for i, frame := range frames {
@@ -564,17 +567,21 @@ func (t *Tag) SetComments(comments []Comment) {
 			Text:        comment.Text,
 		}
 	}
-	t.Frames["COMM"] = frames
+	t.SetFrames(frames)
 }
 
 func (t *Tag) HasFrame(name FrameType) bool {
-	_, ok := t.Frames[name]
-	return ok
+	for _, frame := range t.Frames {
+		if frame.ID() == name {
+			return true
+		}
+	}
+	return false
 }
 
 // GetTextFrame returns the text frame specified by name.
 //
-// To access user text frames, specify the name like "TXXX:The
+// To access user text frames, specify a name like "TXXX:The
 // description".
 func (t *Tag) GetTextFrame(name FrameType) string {
 	userFrameName, ok := frameNameToUserFrame(name)
@@ -583,17 +590,17 @@ func (t *Tag) GetTextFrame(name FrameType) string {
 	}
 
 	// Get normal text frame
-	frames := t.Frames[name]
-	if len(frames) == 0 {
+	frame, ok := t.GetFrame(name)
+	if !ok {
 		return ""
 	}
 
-	return frames[0].Value()
+	return frame.Value()
 }
 
 func (t *Tag) getUserTextFrame(name string) string {
-	frames, ok := t.Frames["TXXX"]
-	if !ok {
+	frames := t.GetFrames("TXXX")
+	if len(frames) == 0 {
 		return ""
 	}
 
@@ -642,54 +649,98 @@ func (t *Tag) GetTextFrameTime(name FrameType) time.Time {
 }
 
 func (t *Tag) SetTextFrame(name FrameType, value string) {
+	// There may be only one text frame for a given type
+
 	userFrameName, ok := frameNameToUserFrame(name)
 	if ok {
 		t.setUserTextFrame(userFrameName, value)
 		return
 	}
 
-	frames, ok := t.Frames[name]
-	if !ok {
-		frames = make([]Frame, 1)
-		t.Frames[name] = frames
-	}
-	frames[0] = TextInformationFrame{
+	newFrame := TextInformationFrame{
 		FrameHeader: FrameHeader{
 			id: name,
 		},
 		Text: value,
 	}
+
+	for i, frame := range t.Frames {
+		if frame.ID() != name {
+			continue
+		}
+		t.Frames[i] = newFrame
+		return
+	}
+	t.Frames = append(t.Frames, newFrame)
+
 	// TODO what about flags and preserving them?
 }
 
+func (t *Tag) GetFrame(name FrameType) (Frame, bool) {
+	for _, frame := range t.Frames {
+		if frame.ID() == name {
+			return frame, true
+		}
+	}
+	return nil, false
+}
+
+func (t *Tag) GetFrames(name FrameType) []Frame {
+	var frames []Frame
+	for _, frame := range t.Frames {
+		if frame.ID() == name {
+			frames = append(frames, frame)
+		}
+	}
+	return frames
+}
+
+func (t *Tag) SetFrame(frame Frame) {
+	t.RemoveFrames(frame.ID())
+	t.Frames = append(t.Frames, frame)
+}
+
+func (t *Tag) SetFrames(frames []Frame) {
+	if len(frames) == 0 {
+		return
+	}
+	if len(frames) == 1 {
+		t.SetFrame(frames[0])
+		return
+	}
+	typ := frames[0].ID()
+	for _, frame := range frames[1:] {
+		if frame.ID() != typ {
+			panic("called SetFrames with more than one frame type")
+		}
+	}
+	t.RemoveFrames(typ)
+	t.Frames = append(t.Frames, frames...)
+}
+
 func (t *Tag) setUserTextFrame(name string, value string) {
+	// There may be multiple TXXX frames, but only one for each
+	// description
+
 	// Set/create a user text frame
-	frame := UserTextInformationFrame{
+	newFrame := UserTextInformationFrame{
 		FrameHeader: FrameHeader{id: "TXXX"},
 		Description: name,
 		Text:        value,
 	}
 
-	frames, ok := t.Frames["TXXX"]
-	if !ok {
-		frames = make([]Frame, 0)
-		t.Frames["TXXX"] = frames
-	}
-
-	var i int
-	for i = range frames {
-		if frames[i].(UserTextInformationFrame).Description == name {
-			ok = true
-			break
+	for i, frame := range t.Frames {
+		if frame.ID() != "TXXX" {
+			continue
 		}
+		if frame.(UserTextInformationFrame).Description != name {
+			continue
+		}
+		t.Frames[i] = newFrame
+		return
 	}
 
-	if ok {
-		frames[i] = frame
-	} else {
-		t.Frames["TXXX"] = append(t.Frames["TXXX"], frame)
-	}
-
+	t.Frames = append(t.Frames, newFrame)
 }
 
 func (t *Tag) SetTextFrameNumber(name FrameType, value int) {
@@ -708,23 +759,13 @@ func (t *Tag) SetTextFrameTime(name FrameType, value time.Time) {
 
 // UserTextFrames returns all TXXX frames.
 func (t *Tag) UserTextFrames() []UserTextInformationFrame {
-	res := make([]UserTextInformationFrame, len(t.Frames["TXXX"]))
-	for i, frame := range t.Frames["TXXX"] {
+	frames := t.GetFrames("TXXX")
+	res := make([]UserTextInformationFrame, len(frames))
+	for i, frame := range frames {
 		res[i] = frame.(UserTextInformationFrame)
 	}
 
 	return res
-}
-
-func (fm FramesMap) size() int {
-	size := 0
-	for _, frames := range fm {
-		for _, frame := range frames {
-			size += frame.Size()
-		}
-	}
-
-	return size
 }
 
 func writeMany(w io.Writer, data ...[]byte) error {

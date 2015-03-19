@@ -134,7 +134,7 @@ func (p PictureType) String() string {
 // TODO: FrameFlags.String()
 
 func (err notATagHeader) Error() string {
-	return fmt.Sprintf("Not an ID3v2 header: %v", err.Magic)
+	return fmt.Sprintf("Not an ID3v2 header: %q", err.Magic)
 }
 
 func (err NotAFrameHeader) Error() string {

@@ -17,7 +17,7 @@ var frameReaders = map[FrameType]fnFrameReader{
 	"PRIV": readPRIVFrame,
 	"APIC": readAPICFrame,
 	"MCDI": readMCDIFrame,
-	"USLT": readUFIDFrame,
+	"USLT": readUSLTFrame,
 }
 
 type Peeker interface {

@@ -755,6 +755,8 @@ func (t *Tag) SetTextFrameTime(name FrameType, value time.Time) {
 }
 
 // TODO all the other methods
+// TODO UFID
+// TODO USLT
 
 // UserTextFrames returns all TXXX frames.
 func (t *Tag) UserTextFrames() []UserTextInformationFrame {

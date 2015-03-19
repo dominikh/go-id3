@@ -248,16 +248,6 @@ func (t *Tag) upgrade() {
 	// TODO TRDA → TDRL
 }
 
-func (t *Tag) RemoveFrames(name FrameType) {
-	var frames []Frame
-	for _, frame := range t.Frames {
-		if frame.ID() != name {
-			frames = append(frames, frame)
-		}
-	}
-	t.Frames = frames
-}
-
 // Validate checks whether the tags are conforming to the
 // specification.
 //
@@ -674,6 +664,16 @@ func (t *Tag) SetTextFrame(name FrameType, value string) {
 	t.Frames = append(t.Frames, newFrame)
 
 	// TODO what about flags and preserving them?
+}
+
+func (t *Tag) RemoveFrames(name FrameType) {
+	var frames []Frame
+	for _, frame := range t.Frames {
+		if frame.ID() != name {
+			frames = append(frames, frame)
+		}
+	}
+	t.Frames = frames
 }
 
 func (t *Tag) GetFrame(name FrameType) (Frame, bool) {

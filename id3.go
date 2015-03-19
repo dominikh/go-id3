@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -837,15 +836,6 @@ func parseTime(input string) (res time.Time, err error) {
 	}
 
 	return
-}
-
-func truncate(f *os.File) error {
-	err := f.Truncate(0)
-	if err != nil {
-		return err
-	}
-	_, err = f.Seek(0, 0)
-	return err
 }
 
 func frameNameToUserFrame(name FrameType) (frameName string, ok bool) {

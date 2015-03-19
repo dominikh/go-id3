@@ -138,7 +138,7 @@ func (err notATagHeader) Error() string {
 }
 
 func (err NotAFrameHeader) Error() string {
-	return fmt.Sprintf("Not a frame header (ID = %v)", err.Bytes.ID)
+	return fmt.Sprintf("Not a frame header (ID = %q)", err.Bytes.ID)
 }
 
 func (err UnsupportedVersion) Error() string {

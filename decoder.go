@@ -20,6 +20,29 @@ var frameReaders = map[FrameType]fnFrameReader{
 	"USLT": readUSLTFrame,
 }
 
+// TODO support the following frames:
+// - AENC - Audio encryption
+// - ASPI - Audio seek point index
+// - COMR - Commercial frame
+// - ENCR - Encryption method registration
+// - EQU2 - Equalisation (2)
+// - ETCO - Event timing codes
+// - GEOB - General encapsulated object
+// - GRID - Group identification registration
+// - LINK - Linked information
+// - MLLT - MPEG location lookup table
+// - OWNE - Ownership frame
+// - PCNT - Play counter
+// - POPM - Popularimeter
+// - POSS - Position synchronisation frame
+// - RBUF - Recommended buffer size
+// - RVA2 - Relative volume adjustment (2)
+// - RVRB - Reverb
+// - SEEK - Seek frame
+// - SIGN -
+// - SYLT - Synchronised lyric/text
+// - SYTC - Synchronised tempo codes
+
 type Peeker interface {
 	Peek(n int) ([]byte, error)
 }

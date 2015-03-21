@@ -3,7 +3,6 @@ package id3
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -13,14 +12,9 @@ import (
 // that doesn't reflect the present
 
 var Magic = []byte("ID3")
-
-const (
-	frameLength   = 10
-	tagHeaderSize = 10
-)
-
 var versionByte = []byte{4, 0}
 
+const frameLength = 10
 const TimeFormat = "2006-01-02T15:04:05"
 
 var timeFormats = []string{
@@ -49,7 +43,6 @@ type InvalidAFrameHeaderError struct {
 	}
 }
 
-// TODO export this error?
 type InvalidTagHeaderError struct {
 	Magic []byte
 }
@@ -744,17 +737,6 @@ func (t *Tag) UserTextFrames() []UserTextInformationFrame {
 	}
 
 	return res
-}
-
-func writeMany(w io.Writer, data ...[]byte) error {
-	for _, data := range data {
-		_, err := w.Write(data)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func desynchsafeInt(b [4]byte) int {

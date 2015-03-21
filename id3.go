@@ -681,7 +681,7 @@ func (t *Tag) UserTextFrames() []UserTextInformationFrame {
 	return res
 }
 
-func (fm FramesMap) size() int {
+func (fm FramesMap) Size() int {
 	size := 0
 	for _, frames := range fm {
 		for _, frame := range frames {

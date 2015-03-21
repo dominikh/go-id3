@@ -49,7 +49,7 @@ func (e *Encoder) WritePadding() error {
 
 func (e *Encoder) WriteTag(t *Tag) error {
 	t.SetTextFrameTime("TDTG", time.Now().UTC())
-	err := e.WriteHeader(t.Frames.size() + e.Padding)
+	err := e.WriteHeader(t.Frames.Size() + e.Padding)
 	if err != nil {
 		return err
 	}

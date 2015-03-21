@@ -82,6 +82,14 @@ func (d *Decoder) remaining() int64 {
 	return d.r.(*io.LimitedReader).N
 }
 
+type UnimplementedFeatureError struct {
+	Feature string
+}
+
+func (err UnimplementedFeatureError) Error() string {
+	return "unsupported feature: " + err.Feature
+}
+
 // Parse parses a tag.
 //
 // Parse will always return a valid tag. In the case of an error, the
@@ -105,11 +113,11 @@ func (d *Decoder) Parse() (*Tag, error) {
 
 	// FIXME consider moving this to ParseHeader
 	if header.Flags.ExtendedHeader() {
-		panic("not implemented: cannot parse extended header")
+		return tag, UnimplementedFeatureError{"extended header"}
 	}
 
 	if header.Flags.Unsynchronisation() {
-		panic("not implemented: cannot parse unsynchronised tag")
+		return tag, UnimplementedFeatureError{"unsynchronised tag"}
 	}
 
 	for {
@@ -223,17 +231,17 @@ func (d *Decoder) ParseFrame() (Frame, error) {
 	frameSize := desynchsafeInt(headerBytes.Size)
 
 	if header.flags.Compressed() {
-		panic("not implemented: cannot read compressed frame")
+		return nil, UnimplementedFeatureError{"compressed frame"}
 		// TODO: Read decompressed size (4 bytes)
 	}
 
 	if header.flags.Encrypted() {
-		panic("not implemented: cannot read encrypted frame")
+		return nil, UnimplementedFeatureError{"encrypted frame"}
 		// TODO: Read encryption method (1 byte)
 	}
 
 	if header.flags.Grouped() {
-		panic("not implemented: cannot read grouped frame")
+		return nil, UnimplementedFeatureError{"grouped frame"}
 		// TODO: Read group identifier (1 byte)
 	}
 

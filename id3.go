@@ -72,13 +72,13 @@ func (err UnsupportedVersionError) Error() string {
 }
 
 type TagHeader struct {
-	Version Version // The ID3v2 version the file currently has on disk
+	Version Version
 	Flags   HeaderFlags
-	size    int // The size of the tag (exluding the size of the header)
+	Size    int // The size of the tag (exluding the size of the header)
 }
 
 type Tag struct {
-	Header TagHeader
+	Flags  HeaderFlags
 	Frames []Frame
 }
 
@@ -204,8 +204,6 @@ func (t *Tag) upgrade() {
 			t.SetTextFrameSlice(frame.ID(), strings.Split(frame.Value(), "/"))
 		}
 	}
-
-	t.Header.Version = 0x0400
 
 	// TODO EQUA → EQU2
 	// TODO IPL → TMCL, TIPL

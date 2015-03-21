@@ -73,7 +73,7 @@ func (d *Decoder) ParseHeader() (TagHeader, error) {
 	}
 
 	d.h = header
-	d.r = io.LimitReader(d.r, int64(header.size))
+	d.r = io.LimitReader(d.r, int64(header.Size))
 
 	return header, nil
 }
@@ -101,7 +101,7 @@ func (d *Decoder) Parse() (*Tag, error) {
 	if err != nil {
 		return tag, err
 	}
-	tag.Header = header
+	tag.Flags = header.Flags
 
 	// FIXME consider moving this to ParseHeader
 	if header.Flags.ExtendedHeader() {
@@ -166,7 +166,7 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 
 	header.Version = version
 	header.Flags = HeaderFlags(data.Flags)
-	header.size = desynchsafeInt(data.Size)
+	header.Size = desynchsafeInt(data.Size)
 
 	return header, nil
 }

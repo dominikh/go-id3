@@ -49,20 +49,18 @@ func (e *Encoder) WritePadding() error {
 
 func (e *Encoder) WriteTag(t *Tag) error {
 	t.SetTextFrameTime("TDTG", time.Now().UTC())
-	var size int
-	for _, frame := range t.Frames {
-		size += frame.Size()
-	}
-	err := e.WriteHeader(size + e.Padding)
+	err := e.WriteHeader(t.Frames.size() + e.Padding)
 	if err != nil {
 		return err
 	}
 
 	// TODO write important frames first
-	for _, frame := range t.Frames {
-		err := e.WriteFrame(frame)
-		if err != nil {
-			return err
+	for _, frames := range t.Frames {
+		for _, frame := range frames {
+			err := e.WriteFrame(frame)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

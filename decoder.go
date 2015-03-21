@@ -53,7 +53,7 @@ func Check(r Peeker) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return bytes.Equal(b, Magic[:]), nil
+	return bytes.Equal(b, Magic), nil
 }
 
 type Decoder struct {
@@ -145,28 +145,28 @@ func readBinary(r io.Reader, args ...interface{}) (err error) {
 // readHeader reads an ID3v2 header. It expects the reader to be
 // seeked to the beginning of the header.
 func (d *Decoder) readHeader() (header TagHeader, err error) {
-	var bytes struct {
+	var data struct {
 		Magic   [3]byte
 		Version [2]byte
 		Flags   byte
 		Size    [4]byte
 	}
 
-	err = binary.Read(d.r, binary.BigEndian, &bytes)
+	err = binary.Read(d.r, binary.BigEndian, &data)
 	if err != nil {
 		return header, err
 	}
-	if bytes.Magic != Magic {
-		return TagHeader{}, notATagHeader{bytes.Magic}
+	if !bytes.Equal(data.Magic[:], Magic) {
+		return TagHeader{}, notATagHeader{data.Magic[:]}
 	}
-	version := Version(int16(bytes.Version[0])<<8 | int16(bytes.Version[1]))
-	if bytes.Version[0] > 4 || bytes.Version[0] < 3 {
+	version := Version(int16(data.Version[0])<<8 | int16(data.Version[1]))
+	if data.Version[0] > 4 || data.Version[0] < 3 {
 		return TagHeader{}, UnsupportedVersion{version}
 	}
 
 	header.Version = version
-	header.Flags = HeaderFlags(bytes.Flags)
-	header.size = desynchsafeInt(bytes.Size)
+	header.Flags = HeaderFlags(data.Flags)
+	header.size = desynchsafeInt(data.Size)
 
 	return header, nil
 }

@@ -9,7 +9,7 @@ func generateHeader(size int) []byte {
 	size = synchsafeInt(size)
 
 	// TODO flags
-	return concat(id3byte, versionByte, nul, intToBytes(size))
+	return concat(Magic, versionByte, nul, intToBytes(size))
 }
 
 type Encoder struct {

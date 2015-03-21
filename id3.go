@@ -16,7 +16,7 @@ import (
 // Enables logging if set to true.
 var Logging LogFlag
 
-var Magic = [3]byte{0x49, 0x44, 0x33}
+var Magic = []byte("ID3")
 
 // TODO make this configurable per file?
 
@@ -34,7 +34,6 @@ const (
 )
 
 var (
-	id3byte     = []byte("ID3")
 	versionByte = []byte{4, 0}
 )
 
@@ -68,7 +67,7 @@ type NotAFrameHeader struct {
 
 // TODO export this error?
 type notATagHeader struct {
-	Magic [3]byte
+	Magic []byte
 }
 
 type UnsupportedVersion struct {

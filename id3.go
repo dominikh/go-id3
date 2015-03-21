@@ -520,7 +520,8 @@ func (t *Tag) SetComments(comments []Comment) {
 			Text:        comment.Text,
 		}
 	}
-	t.SetFrames(frames)
+	t.RemoveFrames("COMM")
+	t.Frames = append(t.Frames, frames...)
 }
 
 func (t *Tag) HasFrame(name FrameType) bool {
@@ -656,29 +657,6 @@ func (t *Tag) GetFrames(name FrameType) []Frame {
 		}
 	}
 	return frames
-}
-
-func (t *Tag) SetFrame(frame Frame) {
-	t.RemoveFrames(frame.ID())
-	t.Frames = append(t.Frames, frame)
-}
-
-func (t *Tag) SetFrames(frames []Frame) {
-	if len(frames) == 0 {
-		return
-	}
-	if len(frames) == 1 {
-		t.SetFrame(frames[0])
-		return
-	}
-	typ := frames[0].ID()
-	for _, frame := range frames[1:] {
-		if frame.ID() != typ {
-			panic("called SetFrames with more than one frame type")
-		}
-	}
-	t.RemoveFrames(typ)
-	t.Frames = append(t.Frames, frames...)
 }
 
 func (t *Tag) setUserTextFrame(name string, value string) {

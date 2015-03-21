@@ -223,7 +223,7 @@ func (d *Decoder) ParseFrame() (Frame, error) {
 			continue
 		}
 
-		return nil, InvalidAFrameHeaderError{headerBytes}
+		return nil, InvalidFrameHeaderError{headerBytes}
 	}
 
 	header.id = FrameType(headerBytes.ID[:])

@@ -35,7 +35,7 @@ type Version int16
 type FrameType string
 type PictureType byte
 
-type InvalidAFrameHeaderError struct {
+type InvalidFrameHeaderError struct {
 	Bytes struct {
 		ID    [4]byte
 		Size  [4]byte
@@ -43,12 +43,24 @@ type InvalidAFrameHeaderError struct {
 	}
 }
 
+func (err InvalidFrameHeaderError) Error() string {
+	return fmt.Sprintf("not a frame header (ID = %q)", err.Bytes.ID)
+}
+
 type InvalidTagHeaderError struct {
 	Magic []byte
 }
 
+func (err InvalidTagHeaderError) Error() string {
+	return fmt.Sprintf("not an ID3v2 header: %q", err.Magic)
+}
+
 type UnsupportedVersionError struct {
 	Version Version
+}
+
+func (err UnsupportedVersionError) Error() string {
+	return fmt.Sprintf("unsupported version: %s", err.Version)
 }
 
 type TagHeader struct {
@@ -106,18 +118,6 @@ func (p PictureType) String() string {
 
 // TODO: HeaderFlags.String()
 // TODO: FrameFlags.String()
-
-func (err InvalidTagHeaderError) Error() string {
-	return fmt.Sprintf("not an ID3v2 header: %q", err.Magic)
-}
-
-func (err InvalidAFrameHeaderError) Error() string {
-	return fmt.Sprintf("not a frame header (ID = %q)", err.Bytes.ID)
-}
-
-func (err UnsupportedVersionError) Error() string {
-	return fmt.Sprintf("unsupported version: %s", err.Version)
-}
 
 func (f HeaderFlags) Unsynchronisation() bool {
 	return (f & 128) > 0

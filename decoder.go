@@ -58,7 +58,7 @@ func Check(r Peeker) (bool, error) {
 
 type Decoder struct {
 	r io.Reader
-	h TagHeader
+	h Header
 }
 
 func NewDecoder(r io.Reader) *Decoder {
@@ -66,10 +66,10 @@ func NewDecoder(r io.Reader) *Decoder {
 }
 
 // ParseHeader parses only the ID3 header.
-func (d *Decoder) ParseHeader() (TagHeader, error) {
+func (d *Decoder) ParseHeader() (Header, error) {
 	header, err := d.readHeader()
 	if err != nil {
-		return TagHeader{}, err
+		return Header{}, err
 	}
 
 	d.h = header
@@ -144,7 +144,7 @@ func readBinary(r io.Reader, args ...interface{}) (err error) {
 
 // readHeader reads an ID3v2 header. It expects the reader to be
 // seeked to the beginning of the header.
-func (d *Decoder) readHeader() (header TagHeader, err error) {
+func (d *Decoder) readHeader() (header Header, err error) {
 	var data struct {
 		Magic   [3]byte
 		Version [2]byte
@@ -157,11 +157,11 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 		return header, err
 	}
 	if !bytes.Equal(data.Magic[:], Magic) {
-		return TagHeader{}, InvalidTagHeaderError{data.Magic[:]}
+		return Header{}, InvalidTagHeaderError{data.Magic[:]}
 	}
 	version := Version(int16(data.Version[0])<<8 | int16(data.Version[1]))
 	if data.Version[0] > 4 || data.Version[0] < 3 {
-		return TagHeader{}, UnsupportedVersionError{version}
+		return Header{}, UnsupportedVersionError{version}
 	}
 
 	header.Version = version

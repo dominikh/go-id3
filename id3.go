@@ -71,7 +71,7 @@ func (err UnsupportedVersionError) Error() string {
 	return fmt.Sprintf("unsupported version: %s", err.Version)
 }
 
-type TagHeader struct {
+type Header struct {
 	Version Version
 	Flags   HeaderFlags
 	Size    int // The size of the tag (exluding the size of the header)

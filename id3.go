@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -13,29 +12,14 @@ import (
 // TODO reevaluate TagHeader. Right now it's a snapshot of the past
 // that doesn't reflect the present
 
-// Enables logging if set to true.
-var Logging LogFlag
-
 var Magic = []byte("ID3")
-
-// TODO make this configurable per file?
-
-type LogFlag bool
-
-func (l LogFlag) Println(args ...interface{}) {
-	if l {
-		log.Println(args...)
-	}
-}
 
 const (
 	frameLength   = 10
 	tagHeaderSize = 10
 )
 
-var (
-	versionByte = []byte{4, 0}
-)
+var versionByte = []byte{4, 0}
 
 const TimeFormat = "2006-01-02T15:04:05"
 
@@ -192,8 +176,6 @@ func (t *Tag) upgrade() {
 	// Upgrade TYER/TDAT/TIME to TDRC if at least
 	// one of TYER, TDAT or TIME are set.
 	if t.HasFrame("TYER") || t.HasFrame("TDAT") || t.HasFrame("TIME") {
-		Logging.Println("Replacing TYER, TDAT and TIME with TDRC...")
-
 		year := t.GetTextFrameNumber("TYER")
 		date := t.GetTextFrame("TDAT")
 		tim := t.GetTextFrame("TIME")
@@ -220,11 +202,8 @@ func (t *Tag) upgrade() {
 	// Upgrade Original Release Year to Original Release Time
 	if !t.HasFrame("TDOR") {
 		if t.HasFrame("XDOR") {
-			Logging.Println("Replacing XDOR with TDOR")
-			panic("not implemented") // FIXME
+			panic("not implemented") // FIXME replace XDOR with TDOR
 		} else if t.HasFrame("TORY") {
-			Logging.Println("Replacing TORY with TDOR")
-
 			year := t.GetTextFrameNumber("TORY")
 			t.SetOriginalReleaseTime(time.Date(year, 0, 0, 0, 0, 0, 0, time.UTC))
 		}
@@ -233,7 +212,6 @@ func (t *Tag) upgrade() {
 	for _, frame := range t.Frames {
 		switch frame.ID() {
 		case "TLAN", "TCON", "TPE1", "TOPE", "TCOM", "TEXT", "TOLY":
-			Logging.Println("Replacing / with x00 for", frame.ID())
 			t.SetTextFrameSlice(frame.ID(), strings.Split(frame.Value(), "/"))
 		}
 	}

@@ -234,7 +234,6 @@ func (f TextInformationFrame) Size() int {
 func (f TextInformationFrame) Encode() []byte {
 	switch f.FrameHeader.ID() {
 	case "TRDA", "TSIZ":
-		Logging.Println("Not writing header", f.FrameHeader.ID())
 		return nil
 	default:
 		return concat(utf8byte, []byte(f.Text))

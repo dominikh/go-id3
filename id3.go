@@ -131,15 +131,15 @@ func (p PictureType) String() string {
 // TODO: FrameFlags.String()
 
 func (err notATagHeader) Error() string {
-	return fmt.Sprintf("Not an ID3v2 header: %q", err.Magic)
+	return fmt.Sprintf("not an ID3v2 header: %q", err.Magic)
 }
 
 func (err NotAFrameHeader) Error() string {
-	return fmt.Sprintf("Not a frame header (ID = %q)", err.Bytes.ID)
+	return fmt.Sprintf("not a frame header (ID = %q)", err.Bytes.ID)
 }
 
 func (err UnsupportedVersion) Error() string {
-	return fmt.Sprintf("Unsupported version: %s", err.Version)
+	return fmt.Sprintf("unsupported version: %s", err.Version)
 }
 
 func (f HeaderFlags) Unsynchronisation() bool {

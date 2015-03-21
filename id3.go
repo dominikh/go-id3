@@ -35,6 +35,14 @@ type Version int16
 type FrameType string
 type PictureType byte
 
+type UnimplementedFeatureError struct {
+	Feature string
+}
+
+func (err UnimplementedFeatureError) Error() string {
+	return "unsupported feature: " + err.Feature
+}
+
 type InvalidFrameHeaderError struct {
 	Bytes struct {
 		ID    [4]byte
@@ -80,18 +88,6 @@ type Comment struct {
 	Language    string
 	Description string
 	Text        string
-}
-
-func concat(bs ...[]byte) []byte {
-	n := 0
-	for _, b := range bs {
-		n += len(b)
-	}
-	out := make([]byte, 0, n)
-	for _, b := range bs {
-		out = append(out, b...)
-	}
-	return out
 }
 
 // NewTag returns an empty tag.
@@ -809,6 +805,18 @@ func frameNameToUserFrame(name FrameType) (frameName string, ok bool) {
 	}
 
 	return string(name[5:]), true
+}
+
+func concat(bs ...[]byte) []byte {
+	n := 0
+	for _, b := range bs {
+		n += len(b)
+	}
+	out := make([]byte, 0, n)
+	for _, b := range bs {
+		out = append(out, b...)
+	}
+	return out
 }
 
 // TRCK

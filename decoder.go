@@ -82,14 +82,6 @@ func (d *Decoder) remaining() int64 {
 	return d.r.(*io.LimitedReader).N
 }
 
-type UnimplementedFeatureError struct {
-	Feature string
-}
-
-func (err UnimplementedFeatureError) Error() string {
-	return "unsupported feature: " + err.Feature
-}
-
 // Parse parses a tag.
 //
 // Parse will always return a valid tag. In the case of an error, the

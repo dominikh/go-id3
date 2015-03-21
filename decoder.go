@@ -157,11 +157,11 @@ func (d *Decoder) readHeader() (header TagHeader, err error) {
 		return header, err
 	}
 	if !bytes.Equal(data.Magic[:], Magic) {
-		return TagHeader{}, notATagHeader{data.Magic[:]}
+		return TagHeader{}, InvalidTagHeaderError{data.Magic[:]}
 	}
 	version := Version(int16(data.Version[0])<<8 | int16(data.Version[1]))
 	if data.Version[0] > 4 || data.Version[0] < 3 {
-		return TagHeader{}, UnsupportedVersion{version}
+		return TagHeader{}, UnsupportedVersionError{version}
 	}
 
 	header.Version = version
@@ -215,7 +215,7 @@ func (d *Decoder) ParseFrame() (Frame, error) {
 			continue
 		}
 
-		return nil, NotAFrameHeader{headerBytes}
+		return nil, InvalidAFrameHeaderError{headerBytes}
 	}
 
 	header.id = FrameType(headerBytes.ID[:])

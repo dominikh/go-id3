@@ -89,6 +89,19 @@ type Comment struct {
 	Text        string
 }
 
+type Peeker interface {
+	Peek(n int) ([]byte, error)
+}
+
+// Check reports whether r looks like it starts with an ID3 tag.
+func Check(r Peeker) (bool, error) {
+	b, err := r.Peek(3)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(b, Magic), nil
+}
+
 // NewTag returns an empty tag.
 func NewTag() *Tag {
 	return &Tag{Frames: make(FramesMap)}

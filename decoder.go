@@ -43,19 +43,6 @@ var frameReaders = map[FrameType]fnFrameReader{
 // - SYLT - Synchronised lyric/text
 // - SYTC - Synchronised tempo codes
 
-type Peeker interface {
-	Peek(n int) ([]byte, error)
-}
-
-// Check reports whether r looks like it starts with an ID3 tag.
-func Check(r Peeker) (bool, error) {
-	b, err := r.Peek(3)
-	if err != nil {
-		return false, err
-	}
-	return bytes.Equal(b, Magic), nil
-}
-
 type Decoder struct {
 	r io.Reader
 	h Header
@@ -410,8 +397,8 @@ func readUSLTFrame(r io.Reader, header FrameHeader, frameSize int) (Frame, error
 	}
 
 	parts := splitNullN(rest, encoding, 2)
-	frame.Language = string(language[:])
 
+	frame.Language = string(language[:])
 	frame.Description = string(encoding.toUTF8(parts[0]))
 	frame.Lyrics = string(encoding.toUTF8(parts[1]))
 

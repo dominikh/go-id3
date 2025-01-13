@@ -89,6 +89,13 @@ type Comment struct {
 	Text        string
 }
 
+type Picture struct {
+	MIMEType    string
+	PictureType PictureType
+	Description string
+	Data        []byte
+}
+
 type Peeker interface {
 	Peek(n int) ([]byte, error)
 }
@@ -541,6 +548,40 @@ func (t *Tag) SetComments(comments []Comment) {
 		}
 	}
 	t.Frames["COMM"] = frames
+}
+
+func (t *Tag) Pictures() []Picture {
+	frames := t.Frames["APIC"]
+	pics := make([]Picture, len(frames))
+	for i, frame := range frames {
+		pic := frame.(PictureFrame)
+		pics[i] = Picture{
+			MIMEType:    pic.MIMEType,
+			PictureType: pic.PictureType,
+			Description: pic.Description,
+			Data:        make([]byte, len(pic.Data)),
+		}
+		copy(pics[i].Data, pic.Data)
+	}
+	return pics
+}
+
+func (t *Tag) SetPictures(pics []Picture) {
+	frames := make([]Frame, len(pics))
+	for i, pic := range pics {
+		data := make([]byte, len(pic.Data))
+		copy(data, pic.Data)
+		frames[i] = PictureFrame{
+			FrameHeader: FrameHeader{
+				id: "APIC",
+			},
+			MIMEType:    pic.MIMEType,
+			PictureType: pic.PictureType,
+			Description: pic.Description,
+			Data:        data,
+		}
+	}
+	t.Frames["APIC"] = frames
 }
 
 func (t *Tag) HasFrame(name FrameType) bool {
